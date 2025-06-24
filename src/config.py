@@ -39,6 +39,7 @@ class ImgurValidator(BaseModel):
 
     client_id: str
     client_secret: str
+    refresh_token: Optional[str] = None
 
 
 class Configuration(BaseModel):
