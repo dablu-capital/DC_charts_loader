@@ -32,6 +32,15 @@ class Indicator(BaseModel):
     parameters: Optional[dict]
 
 
+class ImgurValidator(BaseModel):
+    """
+    Validator for Imgur configuration.
+    """
+
+    client_id: str
+    client_secret: str
+
+
 class Configuration(BaseModel):
     """
     Main configuration class that includes general settings and specific configurations.
@@ -40,6 +49,7 @@ class Configuration(BaseModel):
     general: GeneralValidator
     chart: ChartValidator
     indicators: Optional[List[Indicator]]
+    imgur: ImgurValidator
 
 
 # Load the JSON data from the file into a dictionary
