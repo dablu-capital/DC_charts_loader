@@ -19,5 +19,11 @@
             }
         }
 
-    ]
+    ],
+    "imgur": {
+        "client_id": "my_client_id",
+        "client_secret": "my_client_secret",
+        "refresh_token" : "my_refresh_token"
+    }
+
 }

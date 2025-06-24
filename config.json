@@ -19,5 +19,10 @@
             }
         }
 
-    ]
+    ],
+    "imgur": {
+        "client_id": "bd6082a1caebe5b",
+        "client_secret": "9352843ef64b7018a1c8ee7e9daa3b9fc7b63a6b",
+        "refresh_token" : "f9a0278564f3af858250023f55803a88abad4c86"
+    }
 }
