@@ -1,14 +1,15 @@
 from src.models import ChartsDailyData
 from src.ui import create_and_bind_chart, create_dual_chart_grid
 from src.config import config
-
+from pathlib import Path
 
 if __name__ == "__main__":
-    path = config.general.data_path
+
+    path = Path.cwd() / config.general.data_path
     filename = config.general.data_filename
-    dict_filename = f"{path}/{filename}"
+    dict_filename = path / filename
     # dict_filename =
-    data_filename = dict_filename.replace(".feather", "_data.feather")
+    data_filename = dict_filename.with_name(dict_filename.stem + "_data.feather")
     chart_data = ChartsDailyData(dict_filename, data_filename)
 
     # Choose between single chart or dual chart grid
