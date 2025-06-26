@@ -7,7 +7,6 @@ PROJECT_NAME = "example_project"  # Replace with your project name
 
 screenshots_path = Path().cwd() / "screenshots"
 client_id = config.imgur.client_id
-client_id = "my_client_id"
 client_secret = config.imgur.client_secret
 refresh_token = config.imgur.refresh_token
 
