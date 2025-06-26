@@ -7,3 +7,4 @@ pydantic==2.11.5
 pytest>=8.0.0
 pytest-cov>=6.0.0
 pyimgur==0.8.1
+openpyxl==3.1.5
