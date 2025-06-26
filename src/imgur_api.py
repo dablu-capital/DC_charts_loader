@@ -114,7 +114,7 @@ def upload_screenshots(
 
 def make_excel(
     file_list: list, img_list: list, project_path: Path, project_name: str
-) -> None:
+) -> Path:
     """
     Creates an Excel file with the screenshot information.
     """
@@ -124,4 +124,8 @@ def make_excel(
 
     df = pd.DataFrame({"ticker": ticker_list, "date": date_list, "link": link_list})
 
-    df.to_excel(project_path / f"{project_name}_screenshots.xlsx", index=False)
+    file_path = project_path / f"{project_name}_screenshots.xlsx"
+
+    df.to_excel(file_path, index=False)
+
+    return file_path
