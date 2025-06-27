@@ -308,6 +308,83 @@ class TestSaveScreenshot:
         mock_print.assert_called_once_with(f"Screenshot saved to {expected_filename}")
 
 
+class TestSaveScreenshotDual:
+    """Test cases for the save_screenshot_dual function."""
+
+    @patch("os.makedirs")
+    @patch("PIL.Image.new")
+    @patch("PIL.Image.open")
+    def test_save_screenshot_dual(self, mock_image_open, mock_image_new, mock_makedirs):
+        """Test save_screenshot_dual function with image merging."""
+        from src.ui import save_screenshot_dual
+
+        # Create mock charts and chart_data objects
+        mock_chart1 = Mock()
+        mock_chart1.screenshot = Mock(return_value=b"screenshot_data_1")
+        
+        mock_chart2 = Mock()
+        mock_chart2.screenshot = Mock(return_value=b"screenshot_data_2")
+
+        mock_chart_data1 = Mock()
+        mock_chart_data1.current_index = 0
+        mock_chart_data1.get_metadata.return_value = {
+            "ticker": "AAPL",
+            "date_str": "2023-01-15",
+        }
+
+        mock_chart_data2 = Mock()
+        mock_chart_data2.current_index = 0
+        mock_chart_data2.get_metadata.return_value = {
+            "ticker": "MSFT",
+            "date_str": "2023-01-15",
+        }
+
+        # Mock PIL Images
+        mock_img1 = Mock()
+        mock_img1.size = (800, 600)
+        
+        mock_img2 = Mock()
+        mock_img2.size = (800, 600)
+        
+        mock_combined_img = Mock()
+        
+        # Configure mocks
+        mock_image_open.side_effect = [mock_img1, mock_img2]
+        mock_image_new.return_value = mock_combined_img
+
+        # Mock print to capture output
+        with patch("builtins.print") as mock_print:
+            save_screenshot_dual(mock_chart1, mock_chart2, mock_chart_data1, mock_chart_data2, "test_folder")
+
+        # Verify screenshots were taken from both charts
+        mock_chart1.screenshot.assert_called_once()
+        mock_chart2.screenshot.assert_called_once()
+
+        # Verify PIL Image.open was called twice (for both screenshots)
+        assert mock_image_open.call_count == 2
+
+        # Verify a new combined image was created
+        mock_image_new.assert_called_once_with('RGB', (1600, 600), 'white')
+
+        # Verify images were pasted onto the combined image
+        mock_combined_img.paste.assert_any_call(mock_img1, (0, 0))
+        mock_combined_img.paste.assert_any_call(mock_img2, (800, 0))
+
+        # Verify metadata was retrieved from both charts
+        mock_chart_data1.get_metadata.assert_called_once_with(0)
+        mock_chart_data2.get_metadata.assert_called_once_with(0)
+
+        # Verify directory was created
+        mock_makedirs.assert_called_once_with("test_folder", exist_ok=True)
+
+        # Verify the combined image was saved
+        expected_filename = "test_folder/AAPL_MSFT_2023-01-15_dual_screenshot.png"
+        mock_combined_img.save.assert_called_once_with(expected_filename)
+
+        # Verify output message
+        mock_print.assert_called_once_with(f"Dual chart screenshot saved to {expected_filename}")
+
+
 class TestCreateAndBindChart:
     """Test cases for the create_and_bind_chart function."""
 
