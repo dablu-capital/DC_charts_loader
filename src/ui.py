@@ -175,52 +175,32 @@ def on_down_dual(chart1, chart2, chart_data1, chart_data2):
 def save_screenshot_dual(
     chart1, chart2, chart_data1, chart_data2, folder="screenshots"
 ):
-    """Save a single screenshot containing both charts."""
-    # Temporarily resize both charts to ensure they're visible in the screenshot
-    # Store original widths to restore later
-    original_width1 = chart1.get_width() if hasattr(chart1, 'get_width') else 0.5
-    original_width2 = chart2.get_width() if hasattr(chart2, 'get_width') else 0.5
+    """Save a single screenshot containing both charts by merging individual screenshots."""
+    from PIL import Image
+    import io
     
-    # Make sure both charts are visible with equal width
-    chart1.resize(0.5, 1.0)
-    chart2.resize(0.5, 1.0)
+    # Take screenshots of both charts
+    img1_bytes = chart1.screenshot()
+    img2_bytes = chart2.screenshot()
     
-    # Use the window_screenshot method to capture the entire window
-    # This is a custom method we'll add to ensure we get both charts
-    img = chart1.run_script("""
-        (async function() {
-            // Wait a moment for the resize to take effect
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            try {
-                // Capture the entire window content
-                const canvas = document.createElement('canvas');
-                const container = document.querySelector('.container');
-                
-                if (!container) {
-                    console.error('Container element not found');
-                    return null;
-                }
-                
-                const width = container.offsetWidth;
-                const height = container.offsetHeight;
-                
-                canvas.width = width;
-                canvas.height = height;
-                
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(container, 0, 0);
-                
-                return canvas.toDataURL('image/png').split(',')[1];
-            } catch (error) {
-                console.error('Error capturing screenshot:', error);
-                return null;
-            }
-        })();
-    """)
+    # Convert bytes to PIL Images
+    img1 = Image.open(io.BytesIO(img1_bytes))
+    img2 = Image.open(io.BytesIO(img2_bytes))
     
-    # Convert base64 to bytes if we got a valid response
-    import base64
+    # Get dimensions
+    width1, height1 = img1.size
+    width2, height2 = img2.size
+    
+    # Create a new image with combined width and max height
+    combined_width = width1 + width2
+    combined_height = max(height1, height2)
+    combined_img = Image.new('RGB', (combined_width, combined_height), 'white')
+    
+    # Paste the first image on the left
+    combined_img.paste(img1, (0, 0))
+    
+    # Paste the second image on the right
+    combined_img.paste(img2, (width1, 0))
     
     # Get metadata from both charts
     metadata1 = chart_data1.get_metadata(chart_data1.current_index)
@@ -234,31 +214,8 @@ def save_screenshot_dual(
     # Ensure the screenshots directory exists
     os.makedirs(folder, exist_ok=True)
     
-    # Check if we got a valid image from JavaScript
-    if img is None:
-        print("Failed to capture screenshot. Falling back to individual chart screenshot.")
-        # Fallback to capturing just the first chart
-        img = chart1.screenshot()
-        
-        # Save the screenshot
-        with open(filename, "wb") as f:
-            f.write(img)
-    else:
-        try:
-            # Try to decode the base64 string
-            img_bytes = base64.b64decode(img)
-            
-            # Save the combined screenshot
-            with open(filename, "wb") as f:
-                f.write(img_bytes)
-        except (TypeError, base64.binascii.Error) as e:
-            print(f"Error decoding screenshot data: {e}. Falling back to individual chart screenshot.")
-            # Fallback to capturing just the first chart
-            img = chart1.screenshot()
-            
-            # Save the screenshot
-            with open(filename, "wb") as f:
-                f.write(img)
+    # Save the combined screenshot
+    combined_img.save(filename)
     
     print(f"Dual chart screenshot saved to {filename}")
 
