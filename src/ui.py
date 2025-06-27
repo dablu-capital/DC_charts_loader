@@ -4,6 +4,8 @@ from .config import config
 import pandas as pd
 from typing import Optional
 import os
+from PIL import Image
+import io
 
 # ASCII symbols for maximize/minimize buttons
 FULLSCREEN = "⬜"
@@ -62,7 +64,7 @@ def save_screenshot(chart: Chart, chart_data: ChartsData, folder="screenshots") 
 
     img = chart.screenshot()
     metadata = chart_data.get_metadata(chart_data.current_index)
-    filename = f"{folder}/{metadata['ticker']}_{metadata['date_str']}_screenshot.png"
+    filename = f"{folder}/{metadata['ticker']}_{metadata['date_str']}.png"
     with open(filename, "wb") as f:
         f.write(img)
     print(f"Screenshot saved to {filename}")
@@ -176,47 +178,43 @@ def save_screenshot_dual(
     chart1, chart2, chart_data1, chart_data2, folder="screenshots"
 ):
     """Save a single screenshot containing both charts by merging individual screenshots."""
-    from PIL import Image
-    import io
-    
+
     # Take screenshots of both charts
     img1_bytes = chart1.screenshot()
     img2_bytes = chart2.screenshot()
-    
+
     # Convert bytes to PIL Images
     img1 = Image.open(io.BytesIO(img1_bytes))
     img2 = Image.open(io.BytesIO(img2_bytes))
-    
+
     # Get dimensions
     width1, height1 = img1.size
     width2, height2 = img2.size
-    
+
     # Create a new image with combined width and max height
     combined_width = width1 + width2
     combined_height = max(height1, height2)
-    combined_img = Image.new('RGB', (combined_width, combined_height), 'white')
-    
+    combined_img = Image.new("RGB", (combined_width, combined_height), "white")
+
     # Paste the first image on the left
     combined_img.paste(img1, (0, 0))
-    
+
     # Paste the second image on the right
     combined_img.paste(img2, (width1, 0))
-    
+
     # Get metadata from both charts
     metadata1 = chart_data1.get_metadata(chart_data1.current_index)
     metadata2 = chart_data2.get_metadata(chart_data2.current_index)
-    
+
     # Create a filename that includes information from both charts
-    filename = (
-        f"{folder}/{metadata1['ticker']}_{metadata2['ticker']}_{metadata1['date_str']}_dual_screenshot.png"
-    )
-    
+    filename = f"{folder}/{metadata1['ticker']}_{metadata1['date_str']}.png"
+
     # Ensure the screenshots directory exists
     os.makedirs(folder, exist_ok=True)
-    
+
     # Save the combined screenshot
     combined_img.save(filename)
-    
+
     print(f"Dual chart screenshot saved to {filename}")
 
 
