@@ -176,11 +176,44 @@ def save_screenshot_dual(
     chart1, chart2, chart_data1, chart_data2, folder="screenshots"
 ):
     """Save a single screenshot containing both charts."""
-    # Since chart1 is the main chart that contains both charts in the grid,
-    # we can capture the entire grid with a single screenshot
-    img = chart1.screenshot()
+    # Temporarily resize both charts to ensure they're visible in the screenshot
+    # Store original widths to restore later
+    original_width1 = chart1.get_width() if hasattr(chart1, 'get_width') else 0.5
+    original_width2 = chart2.get_width() if hasattr(chart2, 'get_width') else 0.5
     
-    # Get metadata from both charts for the filename
+    # Make sure both charts are visible with equal width
+    chart1.resize(0.5, 1.0)
+    chart2.resize(0.5, 1.0)
+    
+    # Use the window_screenshot method to capture the entire window
+    # This is a custom method we'll add to ensure we get both charts
+    img = chart1.run_script("""
+        async function captureFullWindow() {
+            // Wait a moment for the resize to take effect
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Capture the entire window content
+            const canvas = document.createElement('canvas');
+            const container = document.querySelector('.container');
+            const width = container.offsetWidth;
+            const height = container.offsetHeight;
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(document.querySelector('.container'), 0, 0);
+            
+            return canvas.toDataURL('image/png').split(',')[1];
+        }
+        return await captureFullWindow();
+    """)
+    
+    # Convert base64 to bytes
+    import base64
+    img_bytes = base64.b64decode(img)
+    
+    # Get metadata from both charts
     metadata1 = chart_data1.get_metadata(chart_data1.current_index)
     metadata2 = chart_data2.get_metadata(chart_data2.current_index)
     
@@ -194,7 +227,7 @@ def save_screenshot_dual(
     
     # Save the combined screenshot
     with open(filename, "wb") as f:
-        f.write(img)
+        f.write(img_bytes)
     
     print(f"Dual chart screenshot saved to {filename}")
 

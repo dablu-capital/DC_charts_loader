@@ -313,16 +313,20 @@ class TestSaveScreenshotDual:
 
     @patch("builtins.open", new_callable=mock_open)
     @patch("os.makedirs")
-    def test_save_screenshot_dual(self, mock_makedirs, mock_file_open):
+    @patch("base64.b64decode")
+    def test_save_screenshot_dual(self, mock_b64decode, mock_makedirs, mock_file_open):
         """Test save_screenshot_dual function."""
         from src.ui import save_screenshot_dual
 
         # Create mock charts and chart_data objects
         mock_chart1 = Mock()
-        mock_chart1.screenshot.return_value = b"fake_image_data_combined"
-
+        mock_chart1.get_width = Mock(return_value=0.5)
+        mock_chart1.resize = Mock()
+        mock_chart1.run_script = Mock(return_value="base64_encoded_image_data")
+        
         mock_chart2 = Mock()
-        # We don't expect chart2.screenshot to be called in the new implementation
+        mock_chart2.get_width = Mock(return_value=0.5)
+        mock_chart2.resize = Mock()
 
         mock_chart_data1 = Mock()
         mock_chart_data1.current_index = 0
@@ -338,13 +342,22 @@ class TestSaveScreenshotDual:
             "date_str": "2023-01-15",
         }
 
+        # Mock base64 decode
+        mock_b64decode.return_value = b"decoded_image_data"
+
         # Mock print to capture output
         with patch("builtins.print") as mock_print:
             save_screenshot_dual(mock_chart1, mock_chart2, mock_chart_data1, mock_chart_data2, "test_folder")
 
-        # Verify screenshot was taken only from chart1 (main chart)
-        mock_chart1.screenshot.assert_called_once()
-        mock_chart2.screenshot.assert_not_called()
+        # Verify charts were resized to ensure both are visible
+        mock_chart1.resize.assert_called_once_with(0.5, 1.0)
+        mock_chart2.resize.assert_called_once_with(0.5, 1.0)
+
+        # Verify run_script was called to capture the full window
+        mock_chart1.run_script.assert_called_once()
+        
+        # Verify base64 decode was called
+        mock_b64decode.assert_called_once_with("base64_encoded_image_data")
 
         # Verify metadata was retrieved from both charts
         mock_chart_data1.get_metadata.assert_called_once_with(0)
@@ -356,7 +369,7 @@ class TestSaveScreenshotDual:
         # Verify file was written with combined filename
         expected_filename = "test_folder/AAPL_MSFT_2023-01-15_dual_screenshot.png"
         mock_file_open.assert_called_once_with(expected_filename, "wb")
-        mock_file_open().write.assert_called_once_with(b"fake_image_data_combined")
+        mock_file_open().write.assert_called_once_with(b"decoded_image_data")
 
         # Verify output message
         mock_print.assert_called_once_with(f"Dual chart screenshot saved to {expected_filename}")
