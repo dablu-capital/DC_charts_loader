@@ -175,26 +175,28 @@ def on_down_dual(chart1, chart2, chart_data1, chart_data2):
 def save_screenshot_dual(
     chart1, chart2, chart_data1, chart_data2, folder="screenshots"
 ):
-    """Save screenshots for both charts."""
-    # Save screenshot for chart 1
-    img1 = chart1.screenshot()
+    """Save a single screenshot containing both charts."""
+    # Since chart1 is the main chart that contains both charts in the grid,
+    # we can capture the entire grid with a single screenshot
+    img = chart1.screenshot()
+    
+    # Get metadata from both charts for the filename
     metadata1 = chart_data1.get_metadata(chart_data1.current_index)
-    filename1 = (
-        f"{folder}/{metadata1['ticker']}_{metadata1['date_str']}_chart1_screenshot.png"
-    )
-    with open(filename1, "wb") as f:
-        f.write(img1)
-
-    # Save screenshot for chart 2
-    img2 = chart2.screenshot()
     metadata2 = chart_data2.get_metadata(chart_data2.current_index)
-    filename2 = (
-        f"{folder}/{metadata2['ticker']}_{metadata2['date_str']}_chart2_screenshot.png"
+    
+    # Create a filename that includes information from both charts
+    filename = (
+        f"{folder}/{metadata1['ticker']}_{metadata2['ticker']}_{metadata1['date_str']}_dual_screenshot.png"
     )
-    with open(filename2, "wb") as f:
-        f.write(img2)
-
-    print(f"Screenshots saved to {filename1} and {filename2}")
+    
+    # Ensure the screenshots directory exists
+    os.makedirs(folder, exist_ok=True)
+    
+    # Save the combined screenshot
+    with open(filename, "wb") as f:
+        f.write(img)
+    
+    print(f"Dual chart screenshot saved to {filename}")
 
 
 def create_dual_chart_grid(
