@@ -314,8 +314,8 @@ class TestSaveScreenshotDual:
     @patch("builtins.open", new_callable=mock_open)
     @patch("os.makedirs")
     @patch("base64.b64decode")
-    def test_save_screenshot_dual(self, mock_b64decode, mock_makedirs, mock_file_open):
-        """Test save_screenshot_dual function."""
+    def test_save_screenshot_dual_success(self, mock_b64decode, mock_makedirs, mock_file_open):
+        """Test save_screenshot_dual function with successful JavaScript execution."""
         from src.ui import save_screenshot_dual
 
         # Create mock charts and chart_data objects
@@ -323,6 +323,7 @@ class TestSaveScreenshotDual:
         mock_chart1.get_width = Mock(return_value=0.5)
         mock_chart1.resize = Mock()
         mock_chart1.run_script = Mock(return_value="base64_encoded_image_data")
+        mock_chart1.screenshot = Mock(return_value=b"fallback_screenshot_data")
         
         mock_chart2 = Mock()
         mock_chart2.get_width = Mock(return_value=0.5)
@@ -373,6 +374,68 @@ class TestSaveScreenshotDual:
 
         # Verify output message
         mock_print.assert_called_once_with(f"Dual chart screenshot saved to {expected_filename}")
+        
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("os.makedirs")
+    def test_save_screenshot_dual_fallback(self, mock_makedirs, mock_file_open):
+        """Test save_screenshot_dual function with JavaScript failure."""
+        from src.ui import save_screenshot_dual
+
+        # Create mock charts and chart_data objects
+        mock_chart1 = Mock()
+        mock_chart1.get_width = Mock(return_value=0.5)
+        mock_chart1.resize = Mock()
+        mock_chart1.run_script = Mock(return_value=None)  # JavaScript returns None
+        mock_chart1.screenshot = Mock(return_value=b"fallback_screenshot_data")
+        
+        mock_chart2 = Mock()
+        mock_chart2.get_width = Mock(return_value=0.5)
+        mock_chart2.resize = Mock()
+
+        mock_chart_data1 = Mock()
+        mock_chart_data1.current_index = 0
+        mock_chart_data1.get_metadata.return_value = {
+            "ticker": "AAPL",
+            "date_str": "2023-01-15",
+        }
+
+        mock_chart_data2 = Mock()
+        mock_chart_data2.current_index = 0
+        mock_chart_data2.get_metadata.return_value = {
+            "ticker": "MSFT",
+            "date_str": "2023-01-15",
+        }
+
+        # Mock print to capture output
+        with patch("builtins.print") as mock_print:
+            save_screenshot_dual(mock_chart1, mock_chart2, mock_chart_data1, mock_chart_data2, "test_folder")
+
+        # Verify charts were resized to ensure both are visible
+        mock_chart1.resize.assert_called_once_with(0.5, 1.0)
+        mock_chart2.resize.assert_called_once_with(0.5, 1.0)
+
+        # Verify run_script was called to capture the full window
+        mock_chart1.run_script.assert_called_once()
+        
+        # Verify fallback screenshot was taken
+        mock_chart1.screenshot.assert_called_once()
+
+        # Verify metadata was retrieved from both charts
+        mock_chart_data1.get_metadata.assert_called_once_with(0)
+        mock_chart_data2.get_metadata.assert_called_once_with(0)
+
+        # Verify directory was created
+        mock_makedirs.assert_called_once_with("test_folder", exist_ok=True)
+
+        # Verify file was written with combined filename
+        expected_filename = "test_folder/AAPL_MSFT_2023-01-15_dual_screenshot.png"
+        mock_file_open.assert_called_once_with(expected_filename, "wb")
+        mock_file_open().write.assert_called_once_with(b"fallback_screenshot_data")
+
+        # Verify output messages
+        assert mock_print.call_count == 2
+        mock_print.assert_any_call("Failed to capture screenshot. Falling back to individual chart screenshot.")
+        mock_print.assert_any_call(f"Dual chart screenshot saved to {expected_filename}")
 
 
 class TestCreateAndBindChart:

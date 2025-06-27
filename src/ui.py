@@ -188,30 +188,39 @@ def save_screenshot_dual(
     # Use the window_screenshot method to capture the entire window
     # This is a custom method we'll add to ensure we get both charts
     img = chart1.run_script("""
-        async function captureFullWindow() {
+        (async function() {
             // Wait a moment for the resize to take effect
             await new Promise(resolve => setTimeout(resolve, 100));
             
-            // Capture the entire window content
-            const canvas = document.createElement('canvas');
-            const container = document.querySelector('.container');
-            const width = container.offsetWidth;
-            const height = container.offsetHeight;
-            
-            canvas.width = width;
-            canvas.height = height;
-            
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(document.querySelector('.container'), 0, 0);
-            
-            return canvas.toDataURL('image/png').split(',')[1];
-        }
-        return await captureFullWindow();
+            try {
+                // Capture the entire window content
+                const canvas = document.createElement('canvas');
+                const container = document.querySelector('.container');
+                
+                if (!container) {
+                    console.error('Container element not found');
+                    return null;
+                }
+                
+                const width = container.offsetWidth;
+                const height = container.offsetHeight;
+                
+                canvas.width = width;
+                canvas.height = height;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(container, 0, 0);
+                
+                return canvas.toDataURL('image/png').split(',')[1];
+            } catch (error) {
+                console.error('Error capturing screenshot:', error);
+                return null;
+            }
+        })();
     """)
     
-    # Convert base64 to bytes
+    # Convert base64 to bytes if we got a valid response
     import base64
-    img_bytes = base64.b64decode(img)
     
     # Get metadata from both charts
     metadata1 = chart_data1.get_metadata(chart_data1.current_index)
@@ -225,9 +234,31 @@ def save_screenshot_dual(
     # Ensure the screenshots directory exists
     os.makedirs(folder, exist_ok=True)
     
-    # Save the combined screenshot
-    with open(filename, "wb") as f:
-        f.write(img_bytes)
+    # Check if we got a valid image from JavaScript
+    if img is None:
+        print("Failed to capture screenshot. Falling back to individual chart screenshot.")
+        # Fallback to capturing just the first chart
+        img = chart1.screenshot()
+        
+        # Save the screenshot
+        with open(filename, "wb") as f:
+            f.write(img)
+    else:
+        try:
+            # Try to decode the base64 string
+            img_bytes = base64.b64decode(img)
+            
+            # Save the combined screenshot
+            with open(filename, "wb") as f:
+                f.write(img_bytes)
+        except (TypeError, base64.binascii.Error) as e:
+            print(f"Error decoding screenshot data: {e}. Falling back to individual chart screenshot.")
+            # Fallback to capturing just the first chart
+            img = chart1.screenshot()
+            
+            # Save the screenshot
+            with open(filename, "wb") as f:
+                f.write(img)
     
     print(f"Dual chart screenshot saved to {filename}")
 
