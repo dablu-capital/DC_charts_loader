@@ -84,11 +84,22 @@ def create_sample_config_data() -> Dict[str, Any]:
             "data_path": "./data",
             "data_filename": "test_data.feather",
         },
-        "chart": {"use_intraday_tf": False, "intraday_tf": "1m"},
+        "chart": {
+            "use_intraday_tf": False, 
+            "intraday_tf": "1m",
+            "n_days_intraday": 10,
+            "n_days_daily": 30,
+            "show_watermark": True
+        },
         "indicators": [
             {"name": "SMA", "parameters": {"period": 20, "source": "close"}},
             {"name": "SMA", "parameters": {"period": 50, "source": "close"}},
         ],
+        "imgur": {
+            "client_id": "test_client_id",
+            "client_secret": "test_client_secret",
+            "refresh_token": "test_refresh_token"
+        }
     }
 
 
