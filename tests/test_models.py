@@ -341,7 +341,7 @@ class TestChartsMinuteData:
         
         # Verify initialization
         assert charts_data.current_index == 0
-        assert charts_data.current_timeframe == "1M"
+        assert charts_data.current_timeframe == "1m"
         assert charts_data.dict_filename == "dict.feather"
         assert charts_data.data_filename == "data.feather"
         
