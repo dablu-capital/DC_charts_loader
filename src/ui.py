@@ -29,20 +29,22 @@ def plot_chart(df: pd.DataFrame, metadata: dict, chart: Chart) -> None:
     :param chart_data: The ChartsData object containing the data.
     """
     chart.set(df)
-    try:
-        # Try to use custom watermark with vert_align (for ChartsWMOverride)
-        chart.watermark(
-            f"{metadata['ticker']} {metadata['timeframe']} {metadata['date_str']}",
-            vert_align="top",
-        )
-    except (AttributeError, TypeError):
-        # Fallback to standard watermark (for regular Chart or subcharts)
+    watermark = config.chart.show_watermark
+    if watermark:
         try:
+            # Try to use custom watermark with vert_align (for ChartsWMOverride)
             chart.watermark(
                 f"{metadata['ticker']} {metadata['timeframe']} {metadata['date_str']}",
+                vert_align="top",
             )
-        except:
-            chart.watermark("na")
+        except (AttributeError, TypeError):
+            # Fallback to standard watermark (for regular Chart or subcharts)
+            try:
+                chart.watermark(
+                    f"{metadata['ticker']} {metadata['timeframe']} {metadata['date_str']}",
+                )
+            except:
+                chart.watermark("na")
     chart.legend(
         visible=True,
         ohlc=True,
