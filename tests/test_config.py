@@ -16,7 +16,7 @@ class TestGeneralValidator:
 
         assert general.version == "1.0.0"
         assert general.data_path == "./data"
-        assert general.data_filename == "test_data.feather"
+        assert general.data_filename == "default.feather"
 
     def test_missing_required_field(self):
         """Test that missing required fields raise validation error."""
@@ -167,7 +167,7 @@ class TestConfigurationLoading:
                 # Check that config was loaded correctly
                 assert isinstance(test_config, Configuration)
                 assert test_config.general.version == "1.0.0"
-                assert test_config.general.data_filename == "test_data.feather"
+                assert test_config.general.data_filename == "default.feather"
                 assert len(test_config.indicators) == 2
                 assert test_config.indicators[0].name == "SMA"
 
