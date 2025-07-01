@@ -82,23 +82,13 @@ def create_sample_config_data() -> Dict[str, Any]:
         "general": {
             "version": "1.0.0",
             "data_path": "./data",
-            "data_filename": "default.feather",
+            "data_filename": "test_data.feather",
         },
-        "chart": {
-            "use_intraday_tf": False,
-            "intraday_tf": "1m",
-            "n_days_intraday": 10,
-            "n_days_daily": 30,
-        },
+        "chart": {"use_intraday_tf": False, "intraday_tf": "1m"},
         "indicators": [
             {"name": "SMA", "parameters": {"period": 20, "source": "close"}},
             {"name": "SMA", "parameters": {"period": 50, "source": "close"}},
         ],
-        "imgur": {
-            "client_id": "mock_client_id",
-            "client_secret": "mock_client_secret",
-            "refresh_token": None,
-        },
     }
 
 
@@ -209,9 +199,7 @@ def create_sample_min_data(
 
         for _ in range(periods):
             # Random walk with smaller changes for minute data
-            change = np.random.normal(
-                0.0001, 0.005
-            )  # Smaller volatility for minute data
+            change = np.random.normal(0.0001, 0.005)  # Smaller volatility for minute data
             current_price *= 1 + change
             prices.append(current_price)
 
