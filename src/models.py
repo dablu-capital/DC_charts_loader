@@ -38,52 +38,6 @@ class ChartsWMOverride(Chart):
           }})"""
         )
 
-    def add_trading_session_shading(
-        self,
-        df: pd.DataFrame,
-        premarket_color: str = "rgba(255, 255, 0, 0.2)",
-        aftermarket_color: str = "rgba(255, 165, 0, 0.2)",
-    ) -> None:
-        """
-        Adds visual indicators for premarket (before 9:30 AM) and aftermarket (after 4:00 PM) trading sessions.
-        
-        Args:
-            df: DataFrame with 'time' column in format 'YYYY-MM-DD HH:MM:SS'
-            premarket_color: Color for premarket indicators (before 9:30 AM)
-            aftermarket_color: Color for aftermarket indicators (after 4:00 PM)
-        """
-        if df.empty or 'time' not in df.columns:
-            return
-        
-        # Parse times and identify market sessions
-        df_copy = df.copy()
-        df_copy['datetime'] = pd.to_datetime(df_copy['time'])
-        df_copy['time_only'] = df_copy['datetime'].dt.time
-        
-        # Define market hours (9:30 AM to 4:00 PM ET)
-        market_open = time(9, 30)
-        market_close = time(16, 0)
-        
-        # Find continuous premarket periods
-        premarket_mask = df_copy['time_only'] < market_open
-        if premarket_mask.any():
-            premarket_times = df_copy[premarket_mask]['time'].tolist()
-            if premarket_times:
-                # Create vertical span for premarket period
-                start_time = premarket_times[0]
-                end_time = premarket_times[-1]
-                self.vertical_span(start_time, end_time, color=premarket_color)
-        
-        # Find continuous aftermarket periods
-        aftermarket_mask = df_copy['time_only'] >= market_close
-        if aftermarket_mask.any():
-            aftermarket_times = df_copy[aftermarket_mask]['time'].tolist()
-            if aftermarket_times:
-                # Create vertical span for aftermarket period
-                start_time = aftermarket_times[0]
-                end_time = aftermarket_times[-1]
-                self.vertical_span(start_time, end_time, color=aftermarket_color)
-
 
 class ChartsData(ABC):
     def __init__(self, charts):

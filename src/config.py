@@ -21,7 +21,7 @@ class ChartValidator(BaseModel):
     intraday_tf: Literal["1m", "5m", "30m", "1h", "4h"]
     n_days_intraday: Annotated[int, Field(gt=0, le=20)]
     n_days_daily: Annotated[int, Field(gt=0, le=365)]
-    show_session_shading: bool = True
+    show_session_shading: bool
 
 
 class Indicator(BaseModel):
