@@ -27,6 +27,13 @@ def plot_chart(df: pd.DataFrame, metadata: dict, chart: Chart) -> None:
     :param chart_data: The ChartsData object containing the data.
     """
     chart.set(df)
+    
+    # Add premarket/aftermarket shading for 1-minute charts (if enabled in config)
+    if (metadata.get('timeframe') == '1m' and 
+        hasattr(chart, 'add_trading_session_shading') and 
+        config.chart.show_session_shading):
+        chart.add_trading_session_shading(df)
+    
     try:
         # Try to use custom watermark with vert_align (for ChartsWMOverride)
         chart.watermark(

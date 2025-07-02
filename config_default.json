@@ -8,7 +8,8 @@
         "use_intraday_tf": true,
         "intraday_tf": "1m",
         "n_days_intraday": 10,
-        "n_days_daily": 30
+        "n_days_daily": 30,
+        "show_session_shading": true
     },
     "indicators": [
         {

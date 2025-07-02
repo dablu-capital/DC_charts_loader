@@ -1,6 +1,7 @@
 from abc import ABC
 import pandas as pd
 from typing import Union, Optional
+from datetime import datetime, time
 from .data import (
     load_daily_data,
     load_daily_df,
@@ -36,6 +37,89 @@ class ChartsWMOverride(Chart):
               }}
           }})"""
         )
+
+    def add_trading_session_shading(
+        self,
+        df: pd.DataFrame,
+        premarket_color: str = "rgba(255, 255, 0, 0.3)",
+        aftermarket_color: str = "rgba(255, 165, 0, 0.3)",
+    ) -> None:
+        """
+        Adds visual indicators for premarket (before 9:30 AM) and aftermarket (after 4:00 PM) trading sessions.
+        
+        Args:
+            df: DataFrame with 'time' column in format 'YYYY-MM-DD HH:MM:SS'
+            premarket_color: Color for premarket indicators (before 9:30 AM)
+            aftermarket_color: Color for aftermarket indicators (after 4:00 PM)
+        """
+        if df.empty or 'time' not in df.columns:
+            return
+        
+        # Parse times and identify market sessions
+        df_copy = df.copy()
+        df_copy['datetime'] = pd.to_datetime(df_copy['time'])
+        df_copy['time_only'] = df_copy['datetime'].dt.time
+        
+        # Define market hours (9:30 AM to 4:00 PM ET)
+        market_open = time(9, 30)
+        market_close = time(16, 0)
+        
+        # Get price range for background rectangles
+        price_min = df[['open', 'high', 'low', 'close']].min().min()
+        price_max = df[['open', 'high', 'low', 'close']].max().max()
+        
+        # Identify session periods
+        premarket_sessions = []
+        aftermarket_sessions = []
+        
+        # Group consecutive premarket periods
+        premarket_data = df_copy[df_copy['time_only'] < market_open]
+        if not premarket_data.empty:
+            premarket_sessions.append({
+                'start': premarket_data['time'].iloc[0],
+                'end': premarket_data['time'].iloc[-1]
+            })
+        
+        # Group consecutive aftermarket periods
+        aftermarket_data = df_copy[df_copy['time_only'] >= market_close]
+        if not aftermarket_data.empty:
+            aftermarket_sessions.append({
+                'start': aftermarket_data['time'].iloc[0],
+                'end': aftermarket_data['time'].iloc[-1]
+            })
+        
+        # Add background rectangles using JavaScript
+        for session in premarket_sessions:
+            self.run_script(f"""
+                // Add premarket shading
+                {self.id}.chart.addAreaSeries({{
+                    topColor: '{premarket_color}',
+                    bottomColor: '{premarket_color}',
+                    lineColor: 'transparent',
+                    lineWidth: 0,
+                    priceLineVisible: false,
+                    title: 'Pre-Market'
+                }}).setData([
+                    {{time: '{session['start']}', value: {price_min}}},
+                    {{time: '{session['end']}', value: {price_max}}}
+                ]);
+            """)
+        
+        for session in aftermarket_sessions:
+            self.run_script(f"""
+                // Add aftermarket shading
+                {self.id}.chart.addAreaSeries({{
+                    topColor: '{aftermarket_color}',
+                    bottomColor: '{aftermarket_color}',
+                    lineColor: 'transparent',
+                    lineWidth: 0,
+                    priceLineVisible: false,
+                    title: 'After-Market'
+                }}).setData([
+                    {{time: '{session['start']}', value: {price_min}}},
+                    {{time: '{session['end']}', value: {price_max}}}
+                ]);
+            """)
 
 
 class ChartsData(ABC):
