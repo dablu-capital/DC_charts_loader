@@ -41,8 +41,8 @@ class ChartsWMOverride(Chart):
     def add_trading_session_shading(
         self,
         df: pd.DataFrame,
-        premarket_color: str = "rgba(255, 255, 0, 0.3)",
-        aftermarket_color: str = "rgba(255, 165, 0, 0.3)",
+        premarket_color: str = "rgba(255, 255, 0, 0.2)",
+        aftermarket_color: str = "rgba(255, 165, 0, 0.2)",
     ) -> None:
         """
         Adds visual indicators for premarket (before 9:30 AM) and aftermarket (after 4:00 PM) trading sessions.
@@ -64,62 +64,25 @@ class ChartsWMOverride(Chart):
         market_open = time(9, 30)
         market_close = time(16, 0)
         
-        # Get price range for background rectangles
-        price_min = df[['open', 'high', 'low', 'close']].min().min()
-        price_max = df[['open', 'high', 'low', 'close']].max().max()
+        # Find continuous premarket periods
+        premarket_mask = df_copy['time_only'] < market_open
+        if premarket_mask.any():
+            premarket_times = df_copy[premarket_mask]['time'].tolist()
+            if premarket_times:
+                # Create vertical span for premarket period
+                start_time = premarket_times[0]
+                end_time = premarket_times[-1]
+                self.vertical_span(start_time, end_time, color=premarket_color)
         
-        # Identify session periods
-        premarket_sessions = []
-        aftermarket_sessions = []
-        
-        # Group consecutive premarket periods
-        premarket_data = df_copy[df_copy['time_only'] < market_open]
-        if not premarket_data.empty:
-            premarket_sessions.append({
-                'start': premarket_data['time'].iloc[0],
-                'end': premarket_data['time'].iloc[-1]
-            })
-        
-        # Group consecutive aftermarket periods
-        aftermarket_data = df_copy[df_copy['time_only'] >= market_close]
-        if not aftermarket_data.empty:
-            aftermarket_sessions.append({
-                'start': aftermarket_data['time'].iloc[0],
-                'end': aftermarket_data['time'].iloc[-1]
-            })
-        
-        # Add background rectangles using JavaScript
-        for session in premarket_sessions:
-            self.run_script(f"""
-                // Add premarket shading
-                {self.id}.chart.addAreaSeries({{
-                    topColor: '{premarket_color}',
-                    bottomColor: '{premarket_color}',
-                    lineColor: 'transparent',
-                    lineWidth: 0,
-                    priceLineVisible: false,
-                    title: 'Pre-Market'
-                }}).setData([
-                    {{time: '{session['start']}', value: {price_min}}},
-                    {{time: '{session['end']}', value: {price_max}}}
-                ]);
-            """)
-        
-        for session in aftermarket_sessions:
-            self.run_script(f"""
-                // Add aftermarket shading
-                {self.id}.chart.addAreaSeries({{
-                    topColor: '{aftermarket_color}',
-                    bottomColor: '{aftermarket_color}',
-                    lineColor: 'transparent',
-                    lineWidth: 0,
-                    priceLineVisible: false,
-                    title: 'After-Market'
-                }}).setData([
-                    {{time: '{session['start']}', value: {price_min}}},
-                    {{time: '{session['end']}', value: {price_max}}}
-                ]);
-            """)
+        # Find continuous aftermarket periods
+        aftermarket_mask = df_copy['time_only'] >= market_close
+        if aftermarket_mask.any():
+            aftermarket_times = df_copy[aftermarket_mask]['time'].tolist()
+            if aftermarket_times:
+                # Create vertical span for aftermarket period
+                start_time = aftermarket_times[0]
+                end_time = aftermarket_times[-1]
+                self.vertical_span(start_time, end_time, color=aftermarket_color)
 
 
 class ChartsData(ABC):
