@@ -27,6 +27,7 @@ def plot_chart(df: pd.DataFrame, metadata: dict, chart: Chart) -> None:
     :param chart_data: The ChartsData object containing the data.
     """
     chart.set(df)
+
     try:
         # Try to use custom watermark with vert_align (for ChartsWMOverride)
         chart.watermark(
@@ -50,6 +51,36 @@ def plot_chart(df: pd.DataFrame, metadata: dict, chart: Chart) -> None:
         percent=False,
     )
     chart.price_line(line_visible=False)
+
+
+def plot_sessions(
+    df: pd.DataFrame,
+    chart: Chart,
+    premarket_color: str = "rgba(255, 255, 255, 0.5)",
+    aftermarket_color: str = "rgba(255, 255, 0, 0.5)",
+) -> None:
+
+    if df.empty or "time" not in df.columns:
+        return
+
+    df_copy = df.copy()
+    df_copy["time"] = pd.to_datetime(df_copy["time"])
+    df_copy.set_index("time", inplace=True)
+
+    df_copy = df_copy.between_time("09:30", "16:00", inclusive="left")
+    date_groups = df_copy.groupby(df_copy.index.date)
+    market_open_times = [group.index[-1] for _, group in date_groups]
+    market_close_times = [group.index[0] for _, group in date_groups]
+
+    # Find continuous premarket periods
+    if len(market_open_times) > 0:
+        for start_time in market_open_times:
+            chart.vertical_span(start_time, color=premarket_color)
+
+    # Find continuous aftermarket periods
+    if len(market_close_times) > 0:
+        for end_time in market_close_times:
+            chart.vertical_span(end_time, color=aftermarket_color)
 
 
 def plot_line(data: pd.DataFrame, chart: Chart, name: str) -> None:
@@ -91,6 +122,8 @@ def create_and_bind_chart(
     df, metadata = chart_data.load_chart(0)
     plot_chart(df, metadata, chart)
     plot_indicators(df, chart)
+    if metadata.get("timeframe") == "1m" and config.chart.show_session_shading:
+        plot_sessions(df, chart)
 
     # bind hotkeys
     chart.hotkey("shift", 1, func=lambda _: on_up(chart, chart_data))
@@ -257,8 +290,11 @@ def create_dual_chart_grid(
 
         # Load initial data
         df, metadata = chart_data.load_chart(0)
+        print(f"Loading chart {chart_number} with data: {metadata}")
         plot_chart(df, metadata, chart)
         plot_indicators(df, chart)
+        if metadata.get("timeframe") == "1m" and config.chart.show_session_shading:
+            plot_sessions(df, chart)
 
         # Add chart identifier
         chart.topbar.textbox("number", f"Chart {chart_number}")
