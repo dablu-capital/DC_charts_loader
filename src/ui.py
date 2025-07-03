@@ -67,20 +67,21 @@ def plot_sessions(
     df_copy["time"] = pd.to_datetime(df_copy["time"])
     df_copy.set_index("time", inplace=True)
 
-    df_copy = df_copy.between_time("09:30", "16:00", inclusive="left")
-    date_groups = df_copy.groupby(df_copy.index.date)
-    market_open_times = [group.index[-1] for _, group in date_groups]
-    market_close_times = [group.index[0] for _, group in date_groups]
+    df_pm = df_copy.between_time("00:00", "09:30", inclusive="left")
+    df_am = df_copy.between_time("16:00", "00:00", inclusive="left")
+    # Group by date and get the first (smallest) and last (biggest) index for each date
+    pm_times = df_pm.index.to_list()
+    am_times = df_am.index.to_list()
 
     # Find continuous premarket periods
-    if len(market_open_times) > 0:
-        for start_time in market_open_times:
-            chart.vertical_span(start_time, color=premarket_color)
+    if len(pm_times) > 0:
+        for pm_time in pm_times:
+            chart.vertical_span(pm_time, color=premarket_color)
 
     # Find continuous aftermarket periods
-    if len(market_close_times) > 0:
-        for end_time in market_close_times:
-            chart.vertical_span(end_time, color=aftermarket_color)
+    if len(am_times) > 0:
+        for am_time in am_times:
+            chart.vertical_span(am_time, color=aftermarket_color)
 
 
 def plot_line(data: pd.DataFrame, chart: Chart, name: str) -> None:
@@ -290,7 +291,6 @@ def create_dual_chart_grid(
 
         # Load initial data
         df, metadata = chart_data.load_chart(0)
-        print(f"Loading chart {chart_number} with data: {metadata}")
         plot_chart(df, metadata, chart)
         plot_indicators(df, chart)
         if metadata.get("timeframe") == "1m" and config.chart.show_session_shading:
