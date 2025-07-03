@@ -1,6 +1,5 @@
 # Bash commands
-- npm run build: Build the project
-- npm run typecheck: Run the typechecker
+- use gh cli for all github related commands
 
 # Code style
 ## Formatting
