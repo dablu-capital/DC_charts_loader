@@ -1,4 +1,4 @@
-from pandera import Column, DataFrameSchema, Check
+from pandera.pandas import Column, DataFrameSchema, Check
 from numpy import datetime64, float32
 from typing import Union
 from numpy import int32
