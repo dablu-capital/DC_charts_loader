@@ -1,5 +1,5 @@
 from src.models import ChartsDailyData
-from src.ui import create_and_bind_chart, create_dual_chart_grid
+from src.ui.models import SingleChartPlotter, DualChartPlotter
 from src.config import config
 from pathlib import Path
 
@@ -16,8 +16,11 @@ if __name__ == "__main__":
     use_dual_chart = config.chart.use_intraday_tf  # Set to False for single chart
 
     if use_dual_chart:
-        chart = create_dual_chart_grid(chart_data)
+        chart_plotter = DualChartPlotter(chart_data)
+
     else:
-        chart = create_and_bind_chart(chart_data)
+        chart_plotter = SingleChartPlotter(chart_data)
+    chart_plotter.setup()
+    chart = chart_plotter.chart
 
     chart.show(block=True)

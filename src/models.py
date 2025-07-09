@@ -1,7 +1,6 @@
 from abc import ABC
 import pandas as pd
-from typing import Union, Optional
-from datetime import datetime, time
+from typing import Optional
 from .data import (
     load_daily_data,
     load_daily_df,
@@ -83,6 +82,7 @@ class ChartsDailyData(ChartsData):
         self.data_filename = data_filename
         self.load_dict()
         self.load_data()
+        self.current_timeframe = "1D"
 
     def load_dict(self):
         self.charts = load_daily_df(self.dict_filename)
@@ -112,6 +112,9 @@ class ChartsDailyData(ChartsData):
         ticker = metadata["ticker"]
         date = metadata["date"]
         df = load_daily_data(ticker, date, self.data)
+
+        print(f"metadata for daily chart: {metadata}")
+
         return df, metadata
 
 
@@ -124,6 +127,7 @@ class ChartsMinuteData(ChartsData):
         self.current_timeframe = "1m"
         self.load_dict()
         self.load_data()
+        self.current_timeframe = "1m"
 
     def load_dict(self):
         self.charts = load_daily_df(self.dict_filename)
@@ -158,4 +162,5 @@ class ChartsMinuteData(ChartsData):
         ticker = metadata["ticker"]
         date = metadata["date"]
         df = load_min_chart(ticker, date, self.data)
+        print(f"metadata for min chart: {metadata}")
         return df, metadata
