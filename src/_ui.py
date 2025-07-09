@@ -2,8 +2,10 @@ from .models import ChartsData, ChartsMinuteData
 from .models import ChartsWMOverride as Chart
 from .config import config
 import pandas as pd
-from typing import Optional
+from typing import Optional, List, Any
 import os
+from lightweight_charts.drawings import Box
+from pathlib import Path
 
 # ASCII symbols for maximize/minimize buttons
 FULLSCREEN = "⬜"
@@ -58,30 +60,60 @@ def plot_sessions(
     chart: Chart,
     premarket_color: str = "rgba(255, 255, 255, 0.5)",
     aftermarket_color: str = "rgba(255, 255, 0, 0.5)",
-) -> None:
+) -> List[Any]:
+
+    drawing_ids = []
 
     if df.empty or "time" not in df.columns:
-        return
+        return drawing_ids
+    df["time"] = pd.to_datetime(df["time"])
+    df.set_index("time", inplace=True)
+    pm_df = df.between_time("00:00", "09:30", inclusive="left").copy()
+    am_df = df.between_time("16:00", "00:00", inclusive="left").copy()
+    pm_times = _box_values(pm_df)
+    am_times = _box_values(am_df)
 
-    df_copy = df.copy()
-    df_copy["time"] = pd.to_datetime(df_copy["time"])
-    df_copy.set_index("time", inplace=True)
+    pm_settings = [(start, end, premarket_color) for start, end in pm_times]
+    am_settings = [(start, end, aftermarket_color) for start, end in am_times]
+    settings = pm_settings + am_settings
 
-    df_pm = df_copy.between_time("00:00", "09:30", inclusive="left")
-    df_am = df_copy.between_time("16:00", "00:00", inclusive="left")
-    # Group by date and get the first (smallest) and last (biggest) index for each date
-    pm_times = df_pm.index.to_list()
-    am_times = df_am.index.to_list()
+    start_value = df.low.min()
+    end_value = df.high.max()
 
-    # Find continuous premarket periods
-    if len(pm_times) > 0:
-        for pm_time in pm_times:
-            chart.vertical_span(pm_time, color=premarket_color)
+    if len(settings) == 0:
+        return drawing_ids
 
-    # Find continuous aftermarket periods
-    if len(am_times) > 0:
-        for am_time in am_times:
-            chart.vertical_span(am_time, color=aftermarket_color)
+    for setting in settings:
+        start_time, end_time, fill_color = setting
+        box_data = chart.box(
+            start_time=start_time,
+            end_time=end_time,
+            start_value=start_value,
+            end_value=end_value,
+            width=0,
+            fill_color=fill_color,
+        )
+        drawing_ids.append(box_data.id)
+
+    return drawing_ids
+
+
+def _box_values(df: pd.DataFrame) -> list:
+    """
+    Extracts start and end times for each day in the DataFrame.
+    Args:
+        df (pd.DataFrame): DataFrame with a datetime index.
+    Returns:
+        list: List of tuples containing start and end times for each day.
+    """
+    times_list = []
+    df_grouped = df.groupby(df.index.date)
+    for group in df_grouped:
+        group_df = group[1]
+        start_time = group_df.index[0]
+        end_time = group_df.index[-1]
+        times_list.append((start_time, end_time))
+    return times_list
 
 
 def plot_line(data: pd.DataFrame, chart: Chart, name: str) -> None:
@@ -100,37 +132,162 @@ def save_screenshot(chart: Chart, chart_data: ChartsData, folder="screenshots") 
     print(f"Screenshot saved to {filename}")
 
 
-def create_and_bind_chart(
-    chart_data: ChartsData,
-) -> Chart:
-    """
-    Creates a Chart object, plots data onto it, and binds hotkeys for user interactions.
+class ChartPlotter:
+    def __init__(self, chart_data: ChartsData, chart: Optional[Chart] = None):
+        self.chart_data = chart_data
+        self.chart = chart if chart is not None else Chart()
+        self.drawing_ids = []
+        print(f"chart plotter initialized")
 
-    Args:
-        df (pd.DataFrame): The data to be plotted on the chart.
-        metadata (dict): Metadata information used for plotting the chart.
-        chart_data (ChartsDailyData): Chart data object used by hotkey callback functions.
+    def setup(self) -> None:
+        df, metadata = self.chart_data.load_chart(0)
+        plot_chart(df, metadata, self.chart)
+        plot_indicators(df, self.chart)
+        if metadata.get("timeframe") == "1m" and config.chart.show_session_shading:
+            self.clear_drawings()
+            print(f"drawings cleared")
+            drawing_list = plot_sessions(df, self.chart)
+            print(f"session shading drawn. {len(drawing_list)} drawings created")
+            self.drawing_ids = self.drawing_ids + drawing_list
+        bind_hotkeys(self)
 
-    Returns:
-        Chart: The configured Chart object with hotkeys bound.
+    def clear_drawings(self):
+        """
+        Clears the current drawing IDs.
+        """
+        if len(self.drawing_ids) == 0:
+            return
+        for drawing in self.drawing_ids:
+            drawing.delete()
 
-    Hotkeys:
-        Shift+1: Triggers the `on_up` callback.
-        Shift+2: Triggers the `on_down` callback.
-        Shift+S: Triggers the `save_screenshot` callback.
-    """
-    chart = Chart()
-    df, metadata = chart_data.load_chart(0)
-    plot_chart(df, metadata, chart)
-    plot_indicators(df, chart)
-    if metadata.get("timeframe") == "1m" and config.chart.show_session_shading:
-        plot_sessions(df, chart)
 
-    # bind hotkeys
-    chart.hotkey("shift", 1, func=lambda _: on_up(chart, chart_data))
-    chart.hotkey("shift", 2, func=lambda _: on_down(chart, chart_data))
-    chart.hotkey("shift", "S", func=lambda _: save_screenshot(chart, chart_data))
-    return chart
+def bind_hotkeys(chart_plotter: ChartPlotter) -> None:
+    chart_plotter.chart.hotkey(
+        "shift", 1, func=lambda _: on_up(chart_plotter.chart, chart_plotter.chart_data)
+    )
+    chart_plotter.chart.hotkey(
+        "shift",
+        2,
+        func=lambda _: on_down(chart_plotter.chart, chart_plotter.chart_data),
+    )
+    chart_plotter.chart.hotkey(
+        "shift",
+        "S",
+        func=lambda _: save_screenshot(chart_plotter.chart, chart_plotter.chart_data),
+    )
+
+
+class DualChartPlotter:
+    def __init__(
+        self,
+        chart_data1: ChartsData,
+        chart_data2: Optional[ChartsMinuteData] = None,
+    ):
+        self.chart_data1 = chart_data1
+        if chart_data2 is None:
+            min_filename = chart_data1.dict_filename.with_name(
+                chart_data1.dict_filename.stem.replace(".feather", "")
+                + "_min_data.feather"
+            )
+            chart_data2 = ChartsMinuteData(chart_data1.dict_filename, min_filename)
+        self.chart_data2 = chart_data2
+        self.chart = Chart(inner_width=0.5, inner_height=1.0)
+        self.right_chart = self.chart.create_subchart(
+            position="right", width=0.5, height=1.0
+        )
+        self.drawing_ids = []
+
+    def setup(self) -> None:
+        charts = [self.chart, self.right_chart]
+        chart_data_list = [self.chart_data1, self.chart_data2]
+        timeframes = ["1m", "5m", "15m", "1h", "1D", "4H", "1H", "15M", "5M", "1M"]
+        for i, (chart, chart_data) in enumerate(zip(charts, chart_data_list)):
+            chart_number = str(i + 1)
+
+            # Load initial data
+            df, metadata = chart_data.load_chart(0)
+            plot_chart(df, metadata, chart)
+            plot_indicators(df, chart)
+            if metadata.get("timeframe") == "1m" and config.chart.show_session_shading:
+                self.clear_drawings()
+                print(f"drawings cleared for chart {chart_number}")
+                drawing_list = plot_sessions(df, chart)
+                print(
+                    f"session shading drawn for chart {chart_number}. {len(drawing_list)} drawings created"
+                )
+                self.drawing_ids.extend(drawing_list)
+
+            # Add chart identifier
+            chart.topbar.textbox("number", f"Chart {chart_number}")
+
+            # Add maximize/minimize button
+            chart.topbar.button(
+                "max",
+                FULLSCREEN,
+                False,
+                align="right",
+                func=lambda target_chart=chart: on_maximize(target_chart, charts),
+            )
+
+            # Determine default timeframe based on chart data type
+            default_timeframe = (
+                "1m" if hasattr(chart_data, "current_timeframe") else "1D"
+            )
+
+            # Add timeframe selector
+            chart.topbar.switcher(
+                "timeframe",
+                options=timeframes,
+                default=default_timeframe,
+                align="right",
+                func=lambda timeframe, target_chart=chart, target_data=chart_data: on_timeframe_change(
+                    target_chart, target_data, timeframe
+                ),
+            )
+
+            # Add separator
+            chart.topbar.textbox("sep", " | ", align="right")
+        dual_bind_hotkeys(self)
+
+    def clear_drawings(self):
+        """
+        Clears the current drawing IDs.
+        """
+        if len(self.drawing_ids) == 0:
+            return
+        for drawing in self.drawing_ids:
+            drawing.delete()
+        self.drawing_ids = []
+
+
+def dual_bind_hotkeys(chart_plotter: DualChartPlotter) -> None:
+    chart_plotter.chart.hotkey(
+        "shift",
+        1,
+        func=lambda _: on_up_dual(chart_plotter
+
+        ),
+    )
+    chart_plotter.chart.hotkey(
+        "shift",
+        2,
+        func=lambda _: on_down_dual(
+            chart_plotter.chart,
+            chart_plotter.right_chart,
+            chart_plotter.chart_data1,
+            chart_plotter.chart_data2,
+        ),
+    )
+    chart_plotter.chart.hotkey(
+        "shift",
+        "S",
+        func=lambda _: save_screenshot_dual(
+            chart_plotter.chart,
+            chart_plotter.right_chart,
+            chart_plotter.chart_data1,
+            chart_plotter.chart_data2,
+        ),
+    )
 
 
 def plot_indicators(df: pd.DataFrame, chart: Chart) -> None:
@@ -188,14 +345,15 @@ def on_timeframe_change(chart, chart_data, timeframe):
     plot_chart(df, metadata, chart)
 
 
-def on_up_dual(chart1, chart2, chart_data1, chart_data2):
-    """Navigate to next chart for dual chart setup."""
-    df1, metadata1 = chart_data1.next_chart()
-    plot_chart(df1, metadata1, chart1)
+# def on_up_dual(chart1, chart2, chart_data1, chart_data2):
+#     """Navigate to next chart for dual chart setup."""
+#     df1, metadata1 = chart_data1.next_chart()
+#     plot_chart(df1, metadata1, chart1)
 
-    df2, metadata2 = chart_data2.next_chart()
-    plot_chart(df2, metadata2, chart2)
-
+#     df2, metadata2 = chart_data2.next_chart()
+#     plot_chart(df2, metadata2, chart2)
+def on_up_dual(chart_plotter: DualChartPlotter):
+    
 
 def on_down_dual(chart1, chart2, chart_data1, chart_data2):
     """Navigate to previous chart for dual chart setup."""
@@ -257,8 +415,8 @@ def create_dual_chart_grid(
     if chart_data2 is None:
         # Find the minute data file by replacing the data filename
         if hasattr(chart_data1, "data_filename"):
-            base_path = os.path.dirname(chart_data1.data_filename)
-            base_name = os.path.basename(chart_data1.data_filename)
+            base_path = Path(chart_data1.data_filename).parent
+            base_name = Path(chart_data1.data_filename).name
             # Replace with _min.feather version
             if base_name.endswith(".feather"):
                 min_filename = base_name.replace("_data.feather", "_min_data.feather")
@@ -274,12 +432,12 @@ def create_dual_chart_grid(
             )
 
     # Create main chart (left side) using custom Chart class
-    main_chart = Chart(inner_width=0.5, inner_height=1.0)
+    chart = Chart(inner_width=0.5, inner_height=1.0)
 
     # Create subchart (right side)
-    right_chart = main_chart.create_subchart(position="right", width=0.5, height=1.0)
+    right_chart = chart.create_subchart(position="right", width=0.5, height=1.0)
 
-    charts = [main_chart, right_chart]
+    charts = [chart, right_chart]
     chart_data_list = [chart_data1, chart_data2]
 
     # Available timeframes
@@ -326,22 +484,22 @@ def create_dual_chart_grid(
         chart.topbar.textbox("sep", " | ", align="right")
 
     # Bind global hotkeys to main chart
-    main_chart.hotkey(
+    chart.hotkey(
         "shift",
         1,
-        func=lambda _: on_up_dual(main_chart, right_chart, chart_data1, chart_data2),
+        func=lambda _: on_up_dual(chart, right_chart, chart_data1, chart_data2),
     )
-    main_chart.hotkey(
+    chart.hotkey(
         "shift",
         2,
-        func=lambda _: on_down_dual(main_chart, right_chart, chart_data1, chart_data2),
+        func=lambda _: on_down_dual(chart, right_chart, chart_data1, chart_data2),
     )
-    main_chart.hotkey(
+    chart.hotkey(
         "shift",
         "S",
         func=lambda _: save_screenshot_dual(
-            main_chart, right_chart, chart_data1, chart_data2
+            chart, right_chart, chart_data1, chart_data2
         ),
     )
 
-    return main_chart
+    return chart
