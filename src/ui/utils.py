@@ -69,10 +69,10 @@ def plot_sessions(
     aftermarket_color: str = "rgba(255, 255, 0, 0.5)",
 ) -> List[Any]:
 
-    drawing_ids = []
+    drawing_list = []
 
     if df.empty or "time" not in df.columns:
-        return drawing_ids
+        return drawing_list
     df["time"] = pd.to_datetime(df["time"])
     df.set_index("time", inplace=True)
     pm_df = df.between_time("00:00", "09:30", inclusive="left").copy()
@@ -88,7 +88,7 @@ def plot_sessions(
     end_value = df.high.max()
 
     if len(settings) == 0:
-        return drawing_ids
+        return drawing_list
 
     for setting in settings:
         start_time, end_time, fill_color = setting
@@ -100,9 +100,9 @@ def plot_sessions(
             width=0,
             fill_color=fill_color,
         )
-        drawing_ids.append(box_data.id)
+        drawing_list.append(box_data)
 
-    return drawing_ids
+    return drawing_list
 
 
 def _box_values(df: pd.DataFrame) -> list:
