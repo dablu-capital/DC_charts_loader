@@ -2,6 +2,7 @@ from abc import ABC
 from typing import Any, Optional, Literal
 from src.ui.utils import (
     plot_chart,
+    plot_indicators,
     save_screenshot,
     save_screenshot_dual,
     on_maximize,
@@ -67,6 +68,7 @@ class SingleChartPlotter(ChartPlotter):
             font_size=12,
             percent=False,
         )
+        plot_indicators(df, self.chart)
         self.chart.price_line(line_visible=False)
         self.bind_hotkeys()
 
@@ -125,6 +127,7 @@ class DualChartPlotter(ChartPlotter):
         chart_data: ChartsData,
         chart2_data: Optional[ChartsMinuteData] = None,
     ):
+        self.chart_data = chart_data
         if chart2_data is None:
             min_filename = chart_data.dict_filename.with_name(
                 chart_data.dict_filename.stem.replace(".feather", "")
@@ -139,98 +142,106 @@ class DualChartPlotter(ChartPlotter):
         )
         self.drawing_ids = []
 
+        print(f"initalization")
+        print(
+            f"chart_data dict: {self.chart_data.dict_filename} data {self.chart_data.data_filename}"
+        )
+        print(
+            f"chart2_data  dict: {self.chart2_data.dict_filename} data {self.chart2_data.data_filename}"
+        )
+        print(f"chart: {self.chart}")
+
     def setup(self) -> None:
         """
         Set up the dual chart plotter.
         This method initializes both charts and plots the initial data.
         """
-        df, metadata = self.chart_data.load_chart(0)
-        df2, metadata2 = self.chart2_data.load_chart(0)
-
         charts = [self.chart, self.right_chart]
         chart_data_list = [self.chart_data, self.chart2_data]
         timeframes = ["1m", "5m", "15m", "1h", "1D", "4H", "1H", "15M", "5M", "1M"]
-        for i, (chart, chart_data) in enumerate(zip(charts, chart_data_list)):
+        for i, (chart_, chart_data_) in enumerate(zip(charts, chart_data_list)):
             chart_number = str(i + 1)
 
             # Load initial data
-            df, metadata = chart_data.load_chart(0)
+            df, metadata = chart_data_.load_chart(0)
             drawing_list = plot_chart(df, metadata, self.chart)
+            plot_indicators(df, self.chart)
             self.drawing_ids = self.drawing_ids + drawing_list
 
             # Add chart identifier
-            chart.topbar.textbox("number", f"Chart {chart_number}")
+            chart_.topbar.textbox("number", f"Chart {chart_number}")
 
             # Add maximize/minimize button
-            chart.topbar.button(
+            chart_.topbar.button(
                 "max",
                 FULLSCREEN,
                 False,
                 align="right",
-                func=lambda target_chart=chart: on_maximize(target_chart, charts),
+                func=lambda target_chart=chart_: on_maximize(target_chart, charts),
             )
 
             # Determine default timeframe based on chart data type
+            print(f"chart {chart_number} timeframe {chart_data_.current_timeframe}")
             default_timeframe = (
-                "1m" if hasattr(chart_data, "current_timeframe") else "1D"
+                "1m" if hasattr(chart_data_, "current_timeframe") else "1D"
             )
 
             # Add timeframe selector
-            chart.topbar.switcher(
+            chart_.topbar.switcher(
                 "timeframe",
                 options=timeframes,
                 default=default_timeframe,
                 align="right",
-                func=lambda timeframe, target_chart=chart, target_data=chart_data: on_timeframe_change(
+                func=lambda timeframe, target_chart=chart_, target_data=self.chart_data: on_timeframe_change(
                     target_chart, target_data, timeframe
                 ),
             )
 
             # Add separator
-            chart.topbar.textbox("sep", " | ", align="right")
+            chart_.topbar.textbox("sep", " | ", align="right")
         self.bind_hotkeys()
 
-        def update_chart(
-            self, direction: Optional[Literal["previous", "next"]] = "next"
-        ) -> None:
-            """
-            Update both charts with new data based on the direction.
-            Args:
-                direction (str): 'next' to load next chart, 'previous' to load previous chart.
-            """
-            self.clear_drawings()
-            if direction == "previous":
-                df, metadata = self.chart_data.previous_chart()
-                df2, metadata2 = self.chart2_data.previous_chart()
-            else:
-                df, metadata = self.chart_data.next_chart()
-                df2, metadata2 = self.chart2_data.next_chart()
+    def update_chart(
+        self, direction: Optional[Literal["previous", "next"]] = "next"
+    ) -> None:
+        """
+        Update both charts with new data based on the direction.
+        Args:
+            direction (str): 'next' to load next chart, 'previous' to load previous chart.
+        """
+        self.clear_drawings()
+        if direction == "previous":
+            df, metadata = self.chart_data.previous_chart()
+            df2, metadata2 = self.chart2_data.previous_chart()
+        else:
+            df, metadata = self.chart_data.next_chart()
+            df2, metadata2 = self.chart2_data.next_chart()
 
-            drawing_list1 = plot_chart(df, metadata, self.chart)
-            drawing_list2 = plot_chart(df2, metadata2, self.right_chart)
-            self.drawing_ids = drawing_list1 + drawing_list2
+        drawing_list1 = plot_chart(df, metadata, self.chart)
+        drawing_list2 = plot_chart(df2, metadata2, self.right_chart)
+        self.drawing_ids = drawing_list1 + drawing_list2
 
-        def clear_drawings(self):
-            """
-            Clears the current drawing IDs.
-            """
-            if len(self.drawing_ids) == 0:
-                return
-            for drawing in self.drawing_ids:
-                drawing.delete()
+    def clear_drawings(self):
+        """
+        Clears the current drawing IDs.
+        """
+        if len(self.drawing_ids) == 0:
+            return
+        for drawing in self.drawing_ids:
+            drawing.delete()
 
-        def bind_hotkeys(self) -> None:
-            self.chart.hotkey("shift", 1, func=lambda _: self.update_chart("next"))
+    def bind_hotkeys(self) -> None:
+        self.chart.hotkey("shift", 1, func=lambda _: self.update_chart("next"))
 
-            self.chart.hotkey(
-                "shift",
-                2,
-                func=lambda _: self.update_chart("previous"),
-            )
-            self.chart.hotkey(
-                "shift",
-                "S",
-                func=lambda _: save_screenshot_dual(
-                    self.chart, self.right_chart, self.chart_data, self.chart2_data
-                ),
-            )
+        self.chart.hotkey(
+            "shift",
+            2,
+            func=lambda _: self.update_chart("previous"),
+        )
+        self.chart.hotkey(
+            "shift",
+            "S",
+            func=lambda _: save_screenshot_dual(
+                self.chart, self.right_chart, self.chart_data, self.chart2_data
+            ),
+        )

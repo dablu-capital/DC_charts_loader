@@ -13,7 +13,7 @@ def plot_chart(df: pd.DataFrame, metadata: dict, chart: Chart) -> List[Any]:
     Plot the chart with the given DataFrame and metadata.
     """
     set_chart(df, metadata, chart)
-    plot_indicators(df, chart)
+
     drawing_list = []
     if metadata.get("timeframe") == "1m" and config.chart.show_session_shading:
         # print(f"drawings cleared")

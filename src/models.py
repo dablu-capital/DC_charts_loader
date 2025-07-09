@@ -82,6 +82,7 @@ class ChartsDailyData(ChartsData):
         self.data_filename = data_filename
         self.load_dict()
         self.load_data()
+        self.current_timeframe = "1D"
 
     def load_dict(self):
         self.charts = load_daily_df(self.dict_filename)
@@ -126,6 +127,7 @@ class ChartsMinuteData(ChartsData):
         self.current_timeframe = "1m"
         self.load_dict()
         self.load_data()
+        self.current_timeframe = "1m"
 
     def load_dict(self):
         self.charts = load_daily_df(self.dict_filename)
