@@ -19,7 +19,7 @@ venv/
 data/*
 !data/default.feather
 !data/default_data.feather
-!data/default_min.feather
+!data/default_min_data.feather
 
 screenshots/
 

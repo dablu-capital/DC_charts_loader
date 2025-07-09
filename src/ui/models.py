@@ -164,8 +164,8 @@ class DualChartPlotter(ChartPlotter):
 
             # Load initial data
             df, metadata = chart_data_.load_chart(0)
-            drawing_list = plot_chart(df, metadata, self.chart)
-            plot_indicators(df, self.chart)
+            drawing_list = plot_chart(df, metadata, chart_)
+            plot_indicators(df, chart_)
             self.drawing_ids = self.drawing_ids + drawing_list
 
             # Add chart identifier
