@@ -251,6 +251,63 @@ class DualChartPlotter(ChartPlotter):
 
 import json
 import pandas as pd
+from datetime import datetime, timedelta
+
+
+class DoubleClickTracker:
+    """
+    Tracks double clicks on chart and calculates distance between two points.
+    """
+    def __init__(self):
+        self.first_click = None
+        self.click_count = 0
+        
+    def handle_click(self, data):
+        """
+        Handle click events and calculate distance on second click.
+        
+        Args:
+            data: Dictionary containing timestamp and price from click event
+        """
+        self.click_count += 1
+        
+        if self.click_count == 1:
+            # Store first click
+            self.first_click = data
+            logger.info(f"First click recorded at time: {data['timestamp']}, price: {data['price']}")
+            print(f"First click: {data['timestamp']}, price: {data['price']}")
+            
+        elif self.click_count == 2:
+            # Calculate distance on second click
+            second_click = data
+            logger.info(f"Second click recorded at time: {data['timestamp']}, price: {data['price']}")
+            
+            # Calculate time difference in days
+            time_diff = abs((second_click['timestamp'] - self.first_click['timestamp']).total_seconds())
+            days_diff = time_diff / (24 * 3600)  # Convert seconds to days
+            
+            # Calculate price difference
+            price_diff = abs(second_click['price'] - self.first_click['price'])
+            
+            # Log and print results
+            logger.info(f"Distance calculation - Days: {days_diff:.2f}, Price difference: {price_diff:.2f}")
+            print(f"Distance between clicks:")
+            print(f"  Time difference: {days_diff:.2f} days")
+            print(f"  Price difference: {price_diff:.2f}")
+            print(f"  First click: {self.first_click['timestamp']} at {self.first_click['price']}")
+            print(f"  Second click: {second_click['timestamp']} at {second_click['price']}")
+            
+            # Reset for next measurement
+            self.reset()
+            
+    def reset(self):
+        """Reset the tracker for new measurement."""
+        self.first_click = None
+        self.click_count = 0
+
+
+# Global instance for tracking double clicks
+double_click_tracker = DoubleClickTracker()
 
 
 def on_chart_click(chart, time, price):
@@ -295,7 +352,15 @@ def subscribe_click(chart, *, callback):
 
 
 def on_chart_click2(data):
+    """
+    Enhanced callback function that handles double-click distance measurement.
+    
+    Args:
+        data: Dictionary containing timestamp and price from click event
+    """
     print(data)
+    # Use the double-click tracker to handle distance calculation
+    double_click_tracker.handle_click(data)
 
 
 def watch_crosshair_moves(chart):

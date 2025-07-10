@@ -8,6 +8,8 @@ from src.ui.models import (
     ChartPlotter,
     SingleChartPlotter,
     DualChartPlotter,
+    DoubleClickTracker,
+    double_click_tracker,
 )
 from src.models import ChartsData, ChartsMinuteData
 
@@ -408,3 +410,119 @@ class TestDualChartPlotter:
         mock_save_screenshot_dual.assert_called_once_with(
             mock_chart, mock_right_chart, chart_data, chart2_data
         )
+
+
+class TestDoubleClickTracker:
+    """Test cases for the DoubleClickTracker class."""
+
+    def test_init(self):
+        """Test DoubleClickTracker initialization."""
+        tracker = DoubleClickTracker()
+        assert tracker.first_click is None
+        assert tracker.click_count == 0
+
+    def test_first_click(self):
+        """Test handling first click."""
+        tracker = DoubleClickTracker()
+        test_data = {
+            'timestamp': datetime(2023, 1, 1, 10, 0, 0),
+            'price': 100.0
+        }
+        
+        with patch('src.ui.models.logger') as mock_logger:
+            tracker.handle_click(test_data)
+        
+        assert tracker.click_count == 1
+        assert tracker.first_click == test_data
+        mock_logger.info.assert_called_once()
+
+    def test_second_click_distance_calculation(self):
+        """Test distance calculation on second click."""
+        tracker = DoubleClickTracker()
+        
+        # First click
+        first_click = {
+            'timestamp': datetime(2023, 1, 1, 10, 0, 0),
+            'price': 100.0
+        }
+        tracker.handle_click(first_click)
+        
+        # Second click - 1 day later, $50 higher
+        second_click = {
+            'timestamp': datetime(2023, 1, 2, 10, 0, 0),
+            'price': 150.0
+        }
+        
+        with patch('src.ui.models.logger') as mock_logger:
+            tracker.handle_click(second_click)
+        
+        # Should have logged distance calculation
+        calls = mock_logger.info.call_args_list
+        assert len(calls) == 2  # First click + distance calculation
+        
+        # Check that the distance calculation was logged
+        distance_log = calls[1][0][0]
+        assert "Distance calculation" in distance_log
+        assert "Days: 1.00" in distance_log
+        assert "Price difference: 50.00" in distance_log
+        
+        # Tracker should be reset after second click
+        assert tracker.click_count == 0
+        assert tracker.first_click is None
+
+    def test_reset(self):
+        """Test tracker reset functionality."""
+        tracker = DoubleClickTracker()
+        tracker.first_click = {'timestamp': datetime.now(), 'price': 100.0}
+        tracker.click_count = 1
+        
+        tracker.reset()
+        
+        assert tracker.first_click is None
+        assert tracker.click_count == 0
+
+    def test_price_difference_calculation(self):
+        """Test price difference calculation with different scenarios."""
+        tracker = DoubleClickTracker()
+        
+        # Test case: second price lower than first
+        first_click = {
+            'timestamp': datetime(2023, 1, 1, 10, 0, 0),
+            'price': 200.0
+        }
+        second_click = {
+            'timestamp': datetime(2023, 1, 1, 11, 0, 0),
+            'price': 150.0
+        }
+        
+        tracker.handle_click(first_click)
+        
+        with patch('src.ui.models.logger') as mock_logger:
+            tracker.handle_click(second_click)
+        
+        # Should calculate absolute difference
+        distance_log = mock_logger.info.call_args_list[1][0][0]
+        assert "Price difference: 50.00" in distance_log
+
+    def test_time_difference_calculation(self):
+        """Test time difference calculation in days."""
+        tracker = DoubleClickTracker()
+        
+        # Test case: 12 hours difference
+        first_click = {
+            'timestamp': datetime(2023, 1, 1, 10, 0, 0),
+            'price': 100.0
+        }
+        second_click = {
+            'timestamp': datetime(2023, 1, 1, 22, 0, 0),
+            'price': 100.0
+        }
+        
+        tracker.handle_click(first_click)
+        
+        with patch('src.ui.models.logger') as mock_logger:
+            tracker.handle_click(second_click)
+        
+        # Should calculate 0.5 days (12 hours)
+        distance_log = mock_logger.info.call_args_list[1][0][0]
+        assert "Days: 0.50" in distance_log
