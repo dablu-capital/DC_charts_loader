@@ -7,6 +7,7 @@ from src.ui.utils import (
     save_screenshot_dual,
     on_maximize,
     on_timeframe_change,
+    clear_drawings,
     FULLSCREEN,
     CLOSE,
 )
@@ -19,11 +20,6 @@ class ChartPlotter(ABC):
     Abstract base class for chart plotters.
     This class defines the interface for plotting charts.
     """
-
-    def __init__(self, chart_data: ChartsData, chart: Optional[Chart] = None):
-        self.chart_data = chart_data
-        self.chart = chart if chart is not None else Chart()
-        self.drawing_ids = []
 
     def setup(self):
         """
@@ -56,6 +52,11 @@ class SingleChartPlotter(ChartPlotter):
     This class handles the setup and plotting of a single chart.
     """
 
+    def __init__(self, chart_data: ChartsData, chart: Optional[Chart] = None):
+        self.chart_data = chart_data
+        self.chart = chart if chart is not None else Chart(toolbox=True)
+        self.drawing_ids = []
+
     def setup(self):
         df, metadata = self.chart_data.load_chart(0)
         drawing_list = plot_chart(df, metadata, self.chart)
@@ -70,6 +71,12 @@ class SingleChartPlotter(ChartPlotter):
         )
         plot_indicators(df, self.chart)
         self.chart.price_line(line_visible=False)
+        # add a button that will clear all lines created with toolbox when clicked
+        self.chart.topbar.button(
+            "clear",
+            button_text="❌",
+            func=clear_drawings,
+        )
         self.bind_hotkeys()
 
     def update_chart(self, direction: Optional[Literal["previous", "next"]] = "next"):

@@ -198,3 +198,7 @@ def save_screenshot_dual(
     )
     with open(filename2, "wb") as f:
         f.write(img2)
+
+
+def clear_drawings(chart: Chart) -> None:
+    chart.run_script(f"if ({chart.id}.toolBox) {chart.id}.toolBox.clearDrawings()")
