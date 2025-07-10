@@ -13,6 +13,7 @@ from src.ui.utils import (
 )
 from src.models import ChartsData, ChartsMinuteData
 from src.models import ChartsWMOverride as Chart
+from src.logger import logger
 
 
 class ChartPlotter(ABC):
@@ -77,6 +78,10 @@ class SingleChartPlotter(ChartPlotter):
             button_text="❌",
             func=clear_drawings,
         )
+        # self.chart.events.click += on_chart_click
+        watch_crosshair_moves(self.chart)
+        subscribe_click(self.chart, callback=on_chart_click2)
+
         self.bind_hotkeys()
 
     def update_chart(self, direction: Optional[Literal["previous", "next"]] = "next"):
@@ -242,3 +247,80 @@ class DualChartPlotter(ChartPlotter):
                 self.chart, self.right_chart, self.chart_data, self.chart2_data
             ),
         )
+
+
+import json
+import pandas as pd
+
+
+def on_chart_click(chart, time, price):
+    """
+    Callback function that gets called when chart is clicked
+
+    Args:
+        chart: The chart object that was clicked
+        time: The time coordinate of the click (timestamp)
+        price: The price coordinate of the click (numeric value)
+    """
+    logger.info(f"Chart clicked at time: {time}, price: {price}")
+    logger.info(f"Chart ID: {chart.id}")
+    return time, price
+
+
+def subscribe_click(chart, *, callback):
+    js = (
+        "function clickHandler(param) {"
+        "if (!param.point) {"
+        "return;"
+        "}"
+        f"const time = {chart.id}.chart.timeScale().coordinateToTime(param.point.x);"
+        f"const price = {chart.id}.series.coordinateToPrice(param.point.y);"
+        "const data = JSON.stringify({time: time, price: price});"
+        "window.callbackFunction(`on_click_~_${data}`);"
+        "}"
+        f"{chart.id}.chart.subscribeClick(clickHandler);"
+    )
+
+    def decorated_callback(data):
+        # add some preprocessing
+        data = json.loads(data)
+        data = {
+            "timestamp": pd.to_datetime(data["time"], unit="s"),
+            "price": data["price"],
+        }
+        return callback(data)
+
+    chart.win.handlers["on_click"] = decorated_callback
+    chart.win.run_script(js)
+
+
+def on_chart_click2(data):
+    print(data)
+
+
+def watch_crosshair_moves(chart):
+    chart.crosshair_position = {}
+
+    def on_crosshair_move(point):
+        # assigning a new field to an existing object is an anti-pattern
+        # but here it's convenient (at least for my use case)
+        new_position = json.loads(point)
+        if chart.crosshair_position != new_position:
+            chart.crosshair_position = new_position
+            print(chart.crosshair_position)
+
+    crosshair_script = (
+        "function onCrosshairMove(param) {"
+        "if (!param.point) {"
+        "return;"
+        "}"
+        f"const time = {chart.id}.chart.timeScale().coordinateToTime(param.point.x);"
+        f"const price = {chart.id}.series.coordinateToPrice(param.point.y);"
+        "const data = JSON.stringify({time: time, price: price});"
+        "window.callbackFunction(`on_crosshair_move_~_${data}`);"
+        "}"
+        f"{chart.id}.chart.subscribeCrosshairMove(onCrosshairMove);"
+    )
+
+    chart.win.handlers["on_crosshair_move"] = on_crosshair_move
+    chart.win.run_script(crosshair_script)
