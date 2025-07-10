@@ -113,8 +113,6 @@ class ChartsDailyData(ChartsData):
         date = metadata["date"]
         df = load_daily_data(ticker, date, self.data)
 
-        print(f"metadata for daily chart: {metadata}")
-
         return df, metadata
 
 
@@ -162,5 +160,4 @@ class ChartsMinuteData(ChartsData):
         ticker = metadata["ticker"]
         date = metadata["date"]
         df = load_min_chart(ticker, date, self.data)
-        print(f"metadata for min chart: {metadata}")
         return df, metadata

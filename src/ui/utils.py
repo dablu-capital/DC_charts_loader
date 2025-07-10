@@ -2,6 +2,7 @@ import pandas as pd
 from typing import List, Any
 from src.models import ChartsData, ChartsWMOverride as Chart
 from src.config import config
+from src.logger import logger
 
 # ASCII symbols for maximize/minimize buttons
 FULLSCREEN = "⬜"
@@ -16,9 +17,7 @@ def plot_chart(df: pd.DataFrame, metadata: dict, chart: Chart) -> List[Any]:
 
     drawing_list = []
     if metadata.get("timeframe") == "1m" and config.chart.show_session_shading:
-        # print(f"drawings cleared")
         drawing_list = plot_sessions(df, chart)
-        # print(f"session shading drawn. {len(drawing_list)} drawings created")
     return drawing_list
 
 
@@ -136,7 +135,7 @@ def save_screenshot(chart: Chart, chart_data: ChartsData, folder="screenshots") 
     filename = f"{folder}/{metadata['ticker']}_{metadata['date_str']}_screenshot.png"
     with open(filename, "wb") as f:
         f.write(img)
-    print(f"Screenshot saved to {filename}")
+    logger.info(f"Screenshot saved to {filename}")
 
 
 def on_maximize(target_chart, charts):
@@ -199,5 +198,3 @@ def save_screenshot_dual(
     )
     with open(filename2, "wb") as f:
         f.write(img2)
-
-    print(f"Screenshots saved to {filename1} and {filename2}")

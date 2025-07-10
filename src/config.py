@@ -2,6 +2,7 @@ import json
 from pydantic import BaseModel, Field
 from typing import Optional, List, Literal, Annotated
 from pathlib import Path
+from src.logger import logger
 
 CONFIG_PATH = Path(__file__).parent.parent / "config.json"
 
