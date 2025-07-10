@@ -73,8 +73,6 @@ def plot_sessions(
 
     if df.empty or "time" not in df.columns:
         return drawing_list
-    if not hasattr(chart, "box"):
-        return drawing_list
     df["time"] = pd.to_datetime(df["time"])
     df.set_index("time", inplace=True)
     pm_df = df.between_time("00:00", "09:30", inclusive="left").copy()
