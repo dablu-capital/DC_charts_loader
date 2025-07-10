@@ -1,6 +1,6 @@
 pyarrow==20.0.0
 pandas
-lightweight_charts==1.0.20
+lightweight_charts==2.1
 tqdm
 pandera
 pydantic==2.11.5
