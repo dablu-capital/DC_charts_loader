@@ -142,15 +142,6 @@ class DualChartPlotter(ChartPlotter):
         )
         self.drawing_ids = []
 
-        print(f"initalization")
-        print(
-            f"chart_data dict: {self.chart_data.dict_filename} data {self.chart_data.data_filename}"
-        )
-        print(
-            f"chart2_data  dict: {self.chart2_data.dict_filename} data {self.chart2_data.data_filename}"
-        )
-        print(f"chart: {self.chart}")
-
     def setup(self) -> None:
         """
         Set up the dual chart plotter.
@@ -181,7 +172,6 @@ class DualChartPlotter(ChartPlotter):
             )
 
             # Determine default timeframe based on chart data type
-            print(f"chart {chart_number} timeframe {chart_data_.current_timeframe}")
             default_timeframe = (
                 "1m" if hasattr(chart_data_, "current_timeframe") else "1D"
             )

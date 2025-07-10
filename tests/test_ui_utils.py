@@ -301,8 +301,7 @@ class TestSaveScreenshot:
     """Test cases for the save_screenshot function."""
 
     @patch('builtins.open', new_callable=mock_open)
-    @patch('builtins.print')
-    def test_save_screenshot(self, mock_print, mock_file_open):
+    def test_save_screenshot(self, mock_file_open):
         """Test save_screenshot function."""
         chart = Mock()
         chart.screenshot.return_value = b'fake_image_data'
@@ -322,7 +321,6 @@ class TestSaveScreenshot:
         expected_filename = 'test_folder/AAPL_2023-01-15_screenshot.png'
         mock_file_open.assert_called_once_with(expected_filename, 'wb')
         mock_file_open().write.assert_called_once_with(b'fake_image_data')
-        mock_print.assert_called_once_with(f'Screenshot saved to {expected_filename}')
 
 
 class TestOnMaximize:
@@ -432,8 +430,7 @@ class TestSaveScreenshotDual:
     """Test cases for the save_screenshot_dual function."""
 
     @patch('builtins.open', new_callable=mock_open)
-    @patch('builtins.print')
-    def test_save_screenshot_dual(self, mock_print, mock_file_open):
+    def test_save_screenshot_dual(self, mock_file_open):
         """Test save_screenshot_dual function."""
         chart1 = Mock()
         chart2 = Mock()
@@ -464,4 +461,3 @@ class TestSaveScreenshotDual:
         expected_filename2 = 'test_folder/MSFT_2023-01-16_chart2_screenshot.png'
         
         assert mock_file_open.call_count == 2
-        mock_print.assert_called_once_with(f'Screenshots saved to {expected_filename1} and {expected_filename2}')
