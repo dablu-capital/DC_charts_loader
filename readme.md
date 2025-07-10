@@ -59,3 +59,9 @@ python -m pytest --cov
 # REFERENCE SITES
 [tradingview lightweight charts](https://tradingview.github.io/lightweight-charts/docs)
 [lightweight charts python](https://lightweight-charts-python.readthedocs.io/en/latest/index.html)
+
+# GENERAL
+activate environment from powershell
+```bash
+.\.venv\Scripts\Activate.ps1
+```

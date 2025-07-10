@@ -37,3 +37,6 @@ todo.md
 
 # test files
 *.coverage
+
+# log files
+logs/

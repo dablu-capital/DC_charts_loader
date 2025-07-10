@@ -2,6 +2,7 @@ import pandas as pd
 from typing import List, Any
 from src.models import ChartsData, ChartsWMOverride as Chart
 from src.config import config
+from src.logger import logger
 
 # ASCII symbols for maximize/minimize buttons
 FULLSCREEN = "⬜"
@@ -134,6 +135,7 @@ def save_screenshot(chart: Chart, chart_data: ChartsData, folder="screenshots") 
     filename = f"{folder}/{metadata['ticker']}_{metadata['date_str']}_screenshot.png"
     with open(filename, "wb") as f:
         f.write(img)
+    logger.info(f"Screenshot saved to {filename}")
 
 
 def on_maximize(target_chart, charts):
