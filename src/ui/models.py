@@ -497,8 +497,9 @@ def subscribe_click(chart, *, callback):
     # Simplified approach - no registry needed since we only use the main chart
     logger.info(f"Setting up click subscription for chart {chart.id}")
     
-    # Create unique handler name for this chart
-    handler_name = f"on_click_{chart.id}"
+    # Create unique handler name for this chart with callback function name to avoid conflicts
+    callback_name = callback.__name__ if hasattr(callback, '__name__') else 'unknown'
+    handler_name = f"on_click_{chart.id}_{callback_name}"
     
     # Simple JavaScript approach - just use the chart directly
     js = (
@@ -516,7 +517,7 @@ def subscribe_click(chart, *, callback):
 
     def decorated_callback(data):
         # add some preprocessing
-        logger.info(f"Raw data received: {data}")
+        logger.info(f"Raw data received by {handler_name}: {data}")
         
         try:
             data = json.loads(data)
@@ -536,12 +537,13 @@ def subscribe_click(chart, *, callback):
                 "price": data["price"],
             }
             logger.info(f"Processed data: {processed_data}")
-            logger.info(f"Using chart directly: {chart.id}")
+            logger.info(f"Using chart directly: {chart.id} with callback {callback_name}")
             return callback(processed_data, chart)
         except Exception as e:
             logger.error(f"Error processing data: {e}")
             return
 
+    logger.info(f"Registering handler {handler_name} for chart {chart.id}")
     chart.win.handlers[handler_name] = decorated_callback
     chart.win.run_script(js)
 
