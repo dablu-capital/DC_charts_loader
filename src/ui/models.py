@@ -290,6 +290,7 @@ class DoubleClickTracker:
         self.click_count: int = 0
         self.chart: Optional[Chart] = None
         self.current_drawings: Dict[str, List[Any]] = {}
+        self.charts_with_markers: Dict[str, Chart] = {}
         
     def set_chart(self, chart: Chart) -> None:
         """Set the chart instance for drawing markers."""
@@ -297,6 +298,8 @@ class DoubleClickTracker:
         # Initialize drawings list for this chart if not exists
         if chart.id not in self.current_drawings:
             self.current_drawings[chart.id] = []
+        # Keep track of charts that have markers
+        self.charts_with_markers[chart.id] = chart
         
     def handle_click(self, data: Dict[str, Any]) -> None:
         """
@@ -351,14 +354,15 @@ class DoubleClickTracker:
         if self.chart is None:
             return
         try:
-            marker = self.chart.marker(
+            # Create marker - this doesn't return an object we can delete later
+            self.chart.marker(
                 time=data['timestamp'],
                 position='below',
                 shape='circle',
                 color='blue',
                 text='1'
             )
-            self.current_drawings[self.chart.id].append(marker)
+            # Note: markers will be cleared using chart.clear_markers()
         except Exception as e:
             logger.warning(f"Could not add first click marker: {e}")
             
@@ -368,17 +372,16 @@ class DoubleClickTracker:
         if self.chart is None:
             return
         try:
-            # Add marker for second click
-            marker2 = self.chart.marker(
+            # Add marker for second click - markers will be cleared using chart.clear_markers()
+            self.chart.marker(
                 time=second_click['timestamp'],
                 position='below',
                 shape='circle',
                 color='red',
                 text='2'
             )
-            self.current_drawings[self.chart.id].append(marker2)
             
-            # Create trend line connecting the two points
+            # Create trend line connecting the two points - these can be deleted individually
             trend_line = self.chart.trend_line(
                 start_time=first_click['timestamp'],
                 start_value=first_click['price'],
@@ -387,7 +390,7 @@ class DoubleClickTracker:
             )
             self.current_drawings[self.chart.id].append(trend_line)
             
-            # Add horizontal line at midpoint with distance info
+            # Add horizontal line at midpoint with distance info - these can be deleted individually
             mid_price = (first_click['price'] + second_click['price']) / 2
             info_text = f"Δ{days_diff:.1f}d | Δ${price_diff:.2f} | {price_change_pct:+.1f}%"
             
@@ -406,6 +409,14 @@ class DoubleClickTracker:
             
     def clear_drawings(self) -> None:
         """Clear all current drawings from all charts."""
+        # Clear markers from all charts that have them
+        for chart_id, chart in self.charts_with_markers.items():
+            try:
+                chart.clear_markers()
+            except Exception as e:
+                logger.warning(f"Could not clear markers from chart {chart_id}: {e}")
+        
+        # Clear other drawing elements (lines, trend lines, etc.)
         for drawings in self.current_drawings.values():
             for drawing in drawings:
                 try:
@@ -415,7 +426,10 @@ class DoubleClickTracker:
                         drawing.remove()
                 except Exception as e:
                     logger.warning(f"Could not remove drawing: {e}")
+        
+        # Reset the tracking dictionaries
         self.current_drawings = {}
+        self.charts_with_markers = {}
             
     def reset(self) -> None:
         """Reset the tracker for new measurement."""

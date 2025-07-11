@@ -422,6 +422,7 @@ class TestDoubleClickTracker:
         assert tracker.first_click is None
         assert tracker.click_count == 0
         assert tracker.current_drawings == {}
+        assert tracker.charts_with_markers == {}
 
     def test_first_click(self):
         """Test handling first click."""
@@ -539,6 +540,7 @@ class TestDoubleClickTracker:
         
         assert tracker.chart == mock_chart
         assert "test_chart" in tracker.current_drawings
+        assert "test_chart" in tracker.charts_with_markers
 
     def test_visual_markers_first_click(self):
         """Test adding visual marker for first click."""
@@ -566,8 +568,9 @@ class TestDoubleClickTracker:
             text='1'
         )
         
-        # Should have stored the marker in drawings
-        assert mock_marker in tracker.current_drawings["test_chart"]
+        # Markers are not stored in current_drawings anymore, they're cleared using chart.clear_markers()
+        # Just verify the chart.marker was called
+        assert mock_chart.marker.call_count == 1
 
     def test_visual_markers_second_click(self):
         """Test adding visual markers for second click with distance measurement."""
@@ -614,19 +617,28 @@ class TestDoubleClickTracker:
         """Test clearing visual drawings."""
         tracker = DoubleClickTracker()
         
-        # Mock drawings with delete method
+        # Mock charts and drawings
+        chart1 = Mock()
+        chart2 = Mock()
         drawing1 = Mock()
         drawing2 = Mock()
+        
         tracker.current_drawings = {"chart1": [drawing1], "chart2": [drawing2]}
+        tracker.charts_with_markers = {"chart1": chart1, "chart2": chart2}
         
         tracker.clear_drawings()
+        
+        # Should have called clear_markers on all charts
+        chart1.clear_markers.assert_called_once()
+        chart2.clear_markers.assert_called_once()
         
         # Should have called delete on all drawings
         drawing1.delete.assert_called_once()
         drawing2.delete.assert_called_once()
         
-        # Should have cleared the dictionary
+        # Should have cleared both dictionaries
         assert len(tracker.current_drawings) == 0
+        assert len(tracker.charts_with_markers) == 0
 
     def test_on_chart_click2_callback(self):
         """Test the chart click callback function."""
@@ -679,9 +691,57 @@ class TestDoubleClickTracker:
         with patch('src.ui.models.logger'):
             tracker.handle_click(test_data2)
         
-        # Should have drawings in both charts
-        assert len(tracker.current_drawings) == 2
+        # Should have drawings tracking for both charts
+        assert len(tracker.current_drawings) == 2  # Both charts initialized
         assert "chart1" in tracker.current_drawings
         assert "chart2" in tracker.current_drawings
-        assert marker1 in tracker.current_drawings["chart1"]
-        assert marker2 in tracker.current_drawings["chart2"]
+        assert len(tracker.current_drawings["chart1"]) == 0  # No non-marker drawings
+        assert len(tracker.current_drawings["chart2"]) == 2  # trend line + horizontal line
+        
+        # Should have both charts registered for marker clearing
+        assert len(tracker.charts_with_markers) == 2
+        assert "chart1" in tracker.charts_with_markers
+        assert "chart2" in tracker.charts_with_markers
+        
+        # Should have called marker on both charts
+        chart1.marker.assert_called_once()
+        chart2.marker.assert_called_once()
+
+    def test_marker_clearing_functionality(self):
+        """Test that markers are properly cleared using chart.clear_markers()."""
+        tracker = DoubleClickTracker()
+        
+        # Setup mock chart
+        mock_chart = Mock()
+        mock_chart.id = "test_chart"
+        mock_chart.marker.return_value = Mock()
+        mock_chart.trend_line.return_value = Mock()
+        mock_chart.horizontal_line.return_value = Mock()
+        
+        tracker.set_chart(mock_chart)
+        
+        # Simulate full measurement (two clicks)
+        first_click = {
+            'timestamp': datetime(2023, 1, 1, 10, 0, 0),
+            'price': 100.0
+        }
+        tracker.handle_click(first_click)
+        
+        second_click = {
+            'timestamp': datetime(2023, 1, 2, 10, 0, 0),
+            'price': 150.0
+        }
+        
+        with patch('src.ui.models.logger'):
+            tracker.handle_click(second_click)
+        
+        # Should have created markers and other drawings
+        assert mock_chart.marker.call_count == 2  # First and second click markers
+        assert mock_chart.trend_line.call_count == 1
+        assert mock_chart.horizontal_line.call_count == 1
+        
+        # Clear drawings
+        tracker.clear_drawings()
+        
+        # Should have called clear_markers to remove all markers
+        mock_chart.clear_markers.assert_called_once()
