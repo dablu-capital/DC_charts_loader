@@ -217,6 +217,7 @@ class DualChartPlotter(ChartPlotter):
             )
             
             # Add double-click tracker subscription for each chart
+            logger.info(f"Setting up click subscription for chart {chart_.id}")
             subscribe_click(chart_, callback=on_chart_click2)
             
         # Add a unified clear measurements button on the main chart
@@ -336,6 +337,13 @@ class DoubleClickTracker:
             # Calculate distance on second click
             second_click = data
             logger.info(f"Second click recorded at time: {data['timestamp']}, price: {data['price']}")
+            
+            # Debug: Check for None values
+            if second_click['timestamp'] is None or self.first_click['timestamp'] is None:
+                logger.error(f"Timestamp is None! Second: {second_click['timestamp']}, First: {self.first_click['timestamp']}")
+                logger.error(f"Second click data: {second_click}")
+                logger.error(f"First click data: {self.first_click}")
+                return
             
             # Calculate time difference in days
             time_diff = abs((second_click['timestamp'] - self.first_click['timestamp']).total_seconds())
@@ -482,11 +490,20 @@ def subscribe_click(chart, *, callback):
     def create_decorated_callback(target_chart):
         def decorated_callback(data):
             # add some preprocessing
+            logger.info(f"Raw data received: {data}")
             data = json.loads(data)
+            logger.info(f"Parsed JSON data: {data}")
+            
+            # Check if time is None or invalid
+            if data.get("time") is None:
+                logger.error(f"Time is None in data: {data}")
+                return
+                
             data = {
                 "timestamp": pd.to_datetime(data["time"], unit="s"),
                 "price": data["price"],
             }
+            logger.info(f"Processed data: {data}")
             return callback(data, target_chart)
         return decorated_callback
 
@@ -506,6 +523,8 @@ def on_chart_click2(data, chart):
     # Use the double-click tracker to handle distance calculation
     # Pass the specific chart that was clicked to ensure markers are drawn on the correct chart
     logger.info(f"Handling click on chart {chart.id} with data: {data}")
+    logger.info(f"Chart type: {type(chart)}")
+    logger.info(f"Chart object: {chart}")
     double_click_tracker.handle_click(data, chart)
 
 
