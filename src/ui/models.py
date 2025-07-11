@@ -166,84 +166,110 @@ class DualChartPlotter(ChartPlotter):
         Set up the dual chart plotter.
         This method initializes both charts and plots the initial data.
         """
-        charts = [self.chart, self.right_chart]
-        chart_data_list = [self.chart_data, self.chart2_data]
+        # Setup main chart (left)
+        self._setup_main_chart()
+        
+        # Setup right chart
+        self._setup_right_chart()
+        
+        # Add unified controls
+        self._add_unified_controls()
+        
+        self.bind_hotkeys()
+
+    def _setup_main_chart(self) -> None:
+        """Setup the main (left) chart with data and controls."""
+        # Load and plot initial data
+        df, metadata = self.chart_data.load_chart(0)
+        drawing_list = plot_chart(df, metadata, self.chart)
+        plot_indicators(df, self.chart)
+        self.drawing_ids.extend(drawing_list)
+        
+        # Add chart-specific controls
+        self._add_chart_controls(
+            chart=self.chart,
+            chart_data=self.chart_data,
+            chart_number="1",
+            is_main_chart=True
+        )
+
+    def _setup_right_chart(self) -> None:
+        """Setup the right chart with data and controls."""
+        # Load and plot initial data
+        df, metadata = self.chart2_data.load_chart(0)
+        drawing_list = plot_chart(df, metadata, self.right_chart)
+        plot_indicators(df, self.right_chart)
+        self.drawing_ids.extend(drawing_list)
+        
+        # Add chart-specific controls
+        self._add_chart_controls(
+            chart=self.right_chart,
+            chart_data=self.chart2_data,
+            chart_number="2",
+            is_main_chart=False
+        )
+
+    def _add_chart_controls(self, chart, chart_data, chart_number: str, is_main_chart: bool) -> None:
+        """Add common controls to a chart."""
         timeframes = ["1m", "5m", "15m", "1h", "1D", "4H", "1H", "15M", "5M", "1M"]
-        for i, (chart_, chart_data_) in enumerate(zip(charts, chart_data_list)):
-            chart_number = str(i + 1)
+        
+        # Add chart identifier
+        chart.topbar.textbox("number", f"Chart {chart_number}")
 
-            # Load initial data
-            df, metadata = chart_data_.load_chart(0)
-            drawing_list = plot_chart(df, metadata, chart_)
-            plot_indicators(df, chart_)
-            self.drawing_ids = self.drawing_ids + drawing_list
+        # Add maximize/minimize button
+        chart.topbar.button(
+            "max",
+            FULLSCREEN,
+            False,
+            align="right",
+            func=lambda target_chart=chart: on_maximize(target_chart, [self.chart, self.right_chart]),
+        )
 
-            # Add chart identifier
-            chart_.topbar.textbox("number", f"Chart {chart_number}")
+        # Determine default timeframe based on chart data type
+        default_timeframe = (
+            "1m" if hasattr(chart_data, "current_timeframe") else "1D"
+        )
 
-            # Add maximize/minimize button
-            chart_.topbar.button(
-                "max",
-                FULLSCREEN,
-                False,
-                align="right",
-                func=lambda target_chart=chart_: on_maximize(target_chart, charts),
+        # Add timeframe selector
+        chart.topbar.switcher(
+            "timeframe",
+            options=timeframes,
+            default=default_timeframe,
+            align="right",
+            func=lambda timeframe, target_chart=chart, target_data=chart_data: on_timeframe_change(
+                target_chart, target_data, timeframe
+            ),
+        )
+
+        # Add separator
+        chart.topbar.textbox("sep", " | ", align="right")
+        
+        # Add toolbox clear button
+        chart.topbar.button(
+            "clear",
+            button_text="❌",
+            func=lambda chart_ref=chart: clear_drawings(chart_ref),
+        )
+        
+        # Add measurement functionality
+        if not is_main_chart:
+            logger.info(f"Setting up click subscription for right chart {chart.id}")
+            subscribe_click(chart, callback=on_chart_click_right)
+            # Add clear measurement button for right chart
+            chart.topbar.button(
+                "clear_distance_right",
+                button_text="📏❌",
+                func=lambda chart_ref=chart: double_click_tracker_right.clear_drawings(),
             )
 
-            # Determine default timeframe based on chart data type
-            default_timeframe = (
-                "1m" if hasattr(chart_data_, "current_timeframe") else "1D"
-            )
-
-            # Add timeframe selector
-            chart_.topbar.switcher(
-                "timeframe",
-                options=timeframes,
-                default=default_timeframe,
-                align="right",
-                func=lambda timeframe, target_chart=chart_, target_data=self.chart_data: on_timeframe_change(
-                    target_chart, target_data, timeframe
-                ),
-            )
-
-            # Add separator
-            chart_.topbar.textbox("sep", " | ", align="right")
-            
-            # Add toolbox clear button for each chart
-            chart_.topbar.button(
-                "clear",
-                button_text="❌",
-                func=lambda chart: clear_drawings(chart),
-            )
-            
-            # Add measurement functionality to both charts
-            if i == 0:  # Main chart
-                logger.info(f"Setting up click subscription for main chart {chart_.id}")
-                subscribe_click(chart_, callback=on_chart_click2)
-                # Add clear measurement button for main chart
-                chart_.topbar.button(
-                    "clear_distance_main",
-                    button_text="📏❌",
-                    func=lambda chart: double_click_tracker.clear_drawings(),
-                )
-            else:  # Right chart
-                logger.info(f"Setting up click subscription for right chart {chart_.id}")
-                subscribe_click(chart_, callback=on_chart_click_right)
-                # Add clear measurement button for right chart
-                chart_.topbar.button(
-                    "clear_distance_right",
-                    button_text="📏❌",
-                    func=lambda chart: double_click_tracker_right.clear_drawings(),
-                )
-            
+    def _add_unified_controls(self) -> None:
+        """Add controls that affect both charts."""
         # Add a unified clear measurements button that clears both charts
         self.chart.topbar.button(
             "clear_distance_all",
             button_text="📏🧹",
             func=lambda chart: self._clear_all_measurements(),
         )
-        
-        self.bind_hotkeys()
 
     def _clear_all_measurements(self):
         """Clear measurements from both charts."""

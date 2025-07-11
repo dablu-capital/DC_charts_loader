@@ -41,9 +41,10 @@ class TestChartPlotter:
 class TestSingleChartPlotter:
     """Test cases for the SingleChartPlotter class."""
 
+    @patch("src.ui.models.subscribe_click")
     @patch("src.ui.models.plot_indicators")
     @patch("src.ui.models.plot_chart")
-    def test_setup(self, mock_plot_chart, mock_plot_indicators):
+    def test_setup(self, mock_plot_chart, mock_plot_indicators, mock_subscribe_click):
         """Test SingleChartPlotter setup."""
         chart_data = Mock()
         chart = Mock()
@@ -74,6 +75,9 @@ class TestSingleChartPlotter:
 
         # Verify hotkeys bound
         assert chart.hotkey.call_count == 3
+
+        # Verify subscribe_click was called
+        mock_subscribe_click.assert_called_once()
 
         # Verify drawing IDs stored
         assert plotter.drawing_ids == ["drawing1", "drawing2"]
@@ -226,7 +230,7 @@ class TestDualChartPlotter:
         assert plotter.drawing_ids == []
 
         # Verify chart creation
-        mock_chart_class.assert_called_once_with(inner_width=0.5, inner_height=1.0)
+        mock_chart_class.assert_called_once_with(inner_width=0.5, inner_height=1.0, toolbox=True)
         mock_chart.create_subchart.assert_called_once_with(
             position="right", width=0.5, height=1.0
         )
@@ -247,6 +251,7 @@ class TestDualChartPlotter:
         assert plotter.chart_data is chart_data
         assert plotter.chart2_data is chart2_data
 
+    @patch("src.ui.models.subscribe_click")
     @patch("src.ui.models.on_timeframe_change")
     @patch("src.ui.models.on_maximize")
     @patch("src.ui.models.plot_indicators")
@@ -257,6 +262,7 @@ class TestDualChartPlotter:
         mock_plot_indicators,
         mock_on_maximize,
         mock_on_timeframe_change,
+        mock_subscribe_click,
     ):
         """Test DualChartPlotter setup."""
         chart_data = Mock()
@@ -297,10 +303,17 @@ class TestDualChartPlotter:
         assert mock_plot_chart.call_count == 2
         assert mock_plot_indicators.call_count == 2
 
-        # Verify UI elements added
-        assert mock_chart.topbar.textbox.call_count == 2  # number and separator
-        assert mock_chart.topbar.button.call_count == 1  # maximize button
+        # Verify UI elements added for both charts
+        assert mock_chart.topbar.textbox.call_count >= 2  # number and separator
+        assert mock_chart.topbar.button.call_count >= 3  # maximize, clear, measurement buttons
         assert mock_chart.topbar.switcher.call_count == 1  # timeframe switcher
+        
+        assert mock_right_chart.topbar.textbox.call_count >= 2  # number and separator
+        assert mock_right_chart.topbar.button.call_count >= 2  # maximize, clear, measurement buttons
+        assert mock_right_chart.topbar.switcher.call_count == 1  # timeframe switcher
+
+        # Verify click subscriptions for both charts
+        assert mock_subscribe_click.call_count == 2
 
         # Verify hotkeys bound
         assert mock_chart.hotkey.call_count == 3
