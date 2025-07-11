@@ -10,6 +10,7 @@ from src.ui.models import (
     DualChartPlotter,
     DoubleClickTracker,
     double_click_tracker,
+    on_chart_click2,
 )
 from src.models import ChartsData, ChartsMinuteData
 
@@ -526,3 +527,116 @@ class TestDoubleClickTracker:
         # Should calculate 0.5 days (12 hours)
         distance_log = mock_logger.info.call_args_list[1][0][0]
         assert "Days: 0.50" in distance_log
+
+    def test_set_chart(self):
+        """Test setting chart instance."""
+        tracker = DoubleClickTracker()
+        mock_chart = Mock()
+        
+        tracker.set_chart(mock_chart)
+        
+        assert tracker.chart == mock_chart
+
+    def test_visual_markers_first_click(self):
+        """Test adding visual marker for first click."""
+        tracker = DoubleClickTracker()
+        mock_chart = Mock()
+        mock_marker = Mock()
+        mock_chart.marker.return_value = mock_marker
+        
+        tracker.set_chart(mock_chart)
+        
+        test_data = {
+            'timestamp': datetime(2023, 1, 1, 10, 0, 0),
+            'price': 100.0
+        }
+        
+        tracker.handle_click(test_data)
+        
+        # Should have called chart.marker
+        mock_chart.marker.assert_called_once_with(
+            time=test_data['timestamp'],
+            position='below',
+            shape='circle',
+            color='blue',
+            text='1'
+        )
+        
+        # Should have stored the marker in drawings
+        assert mock_marker in tracker.current_drawings
+
+    def test_visual_markers_second_click(self):
+        """Test adding visual markers for second click with distance measurement."""
+        tracker = DoubleClickTracker()
+        mock_chart = Mock()
+        mock_marker1 = Mock()
+        mock_marker2 = Mock()
+        mock_trend_line = Mock()
+        mock_horizontal_line = Mock()
+        
+        mock_chart.marker.side_effect = [mock_marker1, mock_marker2]
+        mock_chart.trend_line.return_value = mock_trend_line
+        mock_chart.horizontal_line.return_value = mock_horizontal_line
+        
+        tracker.set_chart(mock_chart)
+        
+        # First click
+        first_click = {
+            'timestamp': datetime(2023, 1, 1, 10, 0, 0),
+            'price': 100.0
+        }
+        tracker.handle_click(first_click)
+        
+        # Second click
+        second_click = {
+            'timestamp': datetime(2023, 1, 2, 10, 0, 0),
+            'price': 150.0
+        }
+        
+        with patch('src.ui.models.logger'):
+            tracker.handle_click(second_click)
+        
+        # Should have called chart methods
+        assert mock_chart.marker.call_count == 2
+        mock_chart.trend_line.assert_called_once()
+        mock_chart.horizontal_line.assert_called_once()
+        
+        # Tracker should be reset after second click (click count and first_click)
+        assert tracker.click_count == 0
+        assert tracker.first_click is None
+
+    def test_clear_drawings(self):
+        """Test clearing visual drawings."""
+        tracker = DoubleClickTracker()
+        
+        # Mock drawings with delete method
+        drawing1 = Mock()
+        drawing2 = Mock()
+        tracker.current_drawings = [drawing1, drawing2]
+        
+        tracker.clear_drawings()
+        
+        # Should have called delete on all drawings
+        drawing1.delete.assert_called_once()
+        drawing2.delete.assert_called_once()
+        
+        # Should have cleared the list
+        assert len(tracker.current_drawings) == 0
+
+    def test_on_chart_click2_callback(self):
+        """Test the chart click callback function."""
+        mock_chart = Mock()
+        test_data = {
+            'timestamp': datetime(2023, 1, 1, 10, 0, 0),
+            'price': 100.0
+        }
+        
+        # Reset the global tracker for clean test
+        double_click_tracker.reset()
+        
+        with patch('src.ui.models.double_click_tracker') as mock_tracker:
+            on_chart_click2(test_data, mock_chart)
+            
+            # Should have set chart and handled click
+            mock_tracker.set_chart.assert_called_once_with(mock_chart)
+            mock_tracker.handle_click.assert_called_once_with(test_data)

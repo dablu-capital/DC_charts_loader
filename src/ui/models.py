@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Any, Optional, Literal
+from typing import Any, Optional, Literal, Dict, List, Union
 from src.ui.utils import (
     plot_chart,
     plot_indicators,
@@ -78,6 +78,12 @@ class SingleChartPlotter(ChartPlotter):
             button_text="❌",
             func=clear_drawings,
         )
+        # add a button to clear distance markers
+        self.chart.topbar.button(
+            "clear_distance",
+            button_text="📏❌",
+            func=lambda: double_click_tracker.clear_drawings(),
+        )
         # self.chart.events.click += on_chart_click
         watch_crosshair_moves(self.chart)
         subscribe_click(self.chart, callback=on_chart_click2)
@@ -91,6 +97,8 @@ class SingleChartPlotter(ChartPlotter):
             direction (str): 'next' to load next chart, 'previous' to load previous chart.
         """
         self.clear_drawings()
+        # Clear distance markers when changing charts
+        double_click_tracker.clear_drawings()
         if direction == "previous":
             df, metadata = self.chart_data.previous_chart()
         else:
@@ -212,6 +220,8 @@ class DualChartPlotter(ChartPlotter):
             direction (str): 'next' to load next chart, 'previous' to load previous chart.
         """
         self.clear_drawings()
+        # Clear distance markers when changing charts
+        double_click_tracker.clear_drawings()
         if direction == "previous":
             df, metadata = self.chart_data.previous_chart()
             df2, metadata2 = self.chart2_data.previous_chart()
@@ -259,10 +269,16 @@ class DoubleClickTracker:
     Tracks double clicks on chart and calculates distance between two points.
     """
     def __init__(self):
-        self.first_click = None
-        self.click_count = 0
+        self.first_click: Optional[Dict[str, Any]] = None
+        self.click_count: int = 0
+        self.chart: Optional[Chart] = None
+        self.current_drawings: List[Any] = []
         
-    def handle_click(self, data):
+    def set_chart(self, chart: Chart) -> None:
+        """Set the chart instance for drawing markers."""
+        self.chart = chart
+        
+    def handle_click(self, data: Dict[str, Any]) -> None:
         """
         Handle click events and calculate distance on second click.
         
@@ -277,7 +293,11 @@ class DoubleClickTracker:
             logger.info(f"First click recorded at time: {data['timestamp']}, price: {data['price']}")
             print(f"First click: {data['timestamp']}, price: {data['price']}")
             
-        elif self.click_count == 2:
+            # Add marker for first click
+            if self.chart:
+                self._add_first_click_marker(data)
+            
+        elif self.click_count == 2 and self.first_click is not None:
             # Calculate distance on second click
             second_click = data
             logger.info(f"Second click recorded at time: {data['timestamp']}, price: {data['price']}")
@@ -286,21 +306,97 @@ class DoubleClickTracker:
             time_diff = abs((second_click['timestamp'] - self.first_click['timestamp']).total_seconds())
             days_diff = time_diff / (24 * 3600)  # Convert seconds to days
             
-            # Calculate price difference
+            # Calculate price difference and percentage
             price_diff = abs(second_click['price'] - self.first_click['price'])
+            price_change_pct = ((second_click['price'] - self.first_click['price']) / self.first_click['price']) * 100
             
             # Log and print results
-            logger.info(f"Distance calculation - Days: {days_diff:.2f}, Price difference: {price_diff:.2f}")
+            logger.info(f"Distance calculation - Days: {days_diff:.2f}, Price difference: {price_diff:.2f}, Price change: {price_change_pct:.2f}%")
             print(f"Distance between clicks:")
             print(f"  Time difference: {days_diff:.2f} days")
             print(f"  Price difference: {price_diff:.2f}")
+            print(f"  Price change: {price_change_pct:.2f}%")
             print(f"  First click: {self.first_click['timestamp']} at {self.first_click['price']}")
             print(f"  Second click: {second_click['timestamp']} at {second_click['price']}")
+            
+            # Add visual markers to chart
+            if self.chart:
+                self._add_distance_markers(self.first_click, second_click, days_diff, price_diff, price_change_pct)
             
             # Reset for next measurement
             self.reset()
             
-    def reset(self):
+    def _add_first_click_marker(self, data: Dict[str, Any]) -> None:
+        """Add a marker for the first click."""
+        if self.chart is None:
+            return
+        try:
+            marker = self.chart.marker(
+                time=data['timestamp'],
+                position='below',
+                shape='circle',
+                color='blue',
+                text='1'
+            )
+            self.current_drawings.append(marker)
+        except Exception as e:
+            logger.warning(f"Could not add first click marker: {e}")
+            
+    def _add_distance_markers(self, first_click: Dict[str, Any], second_click: Dict[str, Any], 
+                             days_diff: float, price_diff: float, price_change_pct: float) -> None:
+        """Add visual markers showing the distance measurement."""
+        if self.chart is None:
+            return
+        try:
+            # Add marker for second click
+            marker2 = self.chart.marker(
+                time=second_click['timestamp'],
+                position='below',
+                shape='circle',
+                color='red',
+                text='2'
+            )
+            self.current_drawings.append(marker2)
+            
+            # Create trend line connecting the two points
+            trend_line = self.chart.trend_line(
+                start_time=first_click['timestamp'],
+                start_value=first_click['price'],
+                end_time=second_click['timestamp'],
+                end_value=second_click['price']
+            )
+            self.current_drawings.append(trend_line)
+            
+            # Add horizontal line at midpoint with distance info
+            mid_price = (first_click['price'] + second_click['price']) / 2
+            info_text = f"Δ{days_diff:.1f}d | Δ${price_diff:.2f} | {price_change_pct:+.1f}%"
+            
+            info_line = self.chart.horizontal_line(
+                price=mid_price,
+                color='purple',
+                width=1,
+                style='dashed',
+                text=info_text,
+                axis_label_visible=True
+            )
+            self.current_drawings.append(info_line)
+            
+        except Exception as e:
+            logger.warning(f"Could not add distance markers: {e}")
+            
+    def clear_drawings(self) -> None:
+        """Clear all current drawings from the chart."""
+        for drawing in self.current_drawings:
+            try:
+                if hasattr(drawing, 'delete'):
+                    drawing.delete()
+                elif hasattr(drawing, 'remove'):
+                    drawing.remove()
+            except Exception as e:
+                logger.warning(f"Could not remove drawing: {e}")
+        self.current_drawings = []
+            
+    def reset(self) -> None:
         """Reset the tracker for new measurement."""
         self.first_click = None
         self.click_count = 0
@@ -345,20 +441,23 @@ def subscribe_click(chart, *, callback):
             "timestamp": pd.to_datetime(data["time"], unit="s"),
             "price": data["price"],
         }
-        return callback(data)
+        return callback(data, chart)
 
     chart.win.handlers["on_click"] = decorated_callback
     chart.win.run_script(js)
 
 
-def on_chart_click2(data):
+def on_chart_click2(data, chart):
     """
     Enhanced callback function that handles double-click distance measurement.
     
     Args:
         data: Dictionary containing timestamp and price from click event
+        chart: The chart instance for drawing markers
     """
     print(data)
+    # Set the chart instance in the tracker
+    double_click_tracker.set_chart(chart)
     # Use the double-click tracker to handle distance calculation
     double_click_tracker.handle_click(data)
 
