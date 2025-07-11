@@ -476,14 +476,14 @@ def subscribe_click(chart, *, callback):
         f"{chart.id}.chart.subscribeClick(clickHandler);"
     )
 
-    def decorated_callback(data):
+    def decorated_callback(data, captured_chart=chart):
         # add some preprocessing
         data = json.loads(data)
         data = {
             "timestamp": pd.to_datetime(data["time"], unit="s"),
             "price": data["price"],
         }
-        return callback(data, chart)
+        return callback(data, captured_chart)
 
     chart.win.handlers["on_click"] = decorated_callback
     chart.win.run_script(js)
@@ -497,9 +497,10 @@ def on_chart_click2(data, chart):
         data: Dictionary containing timestamp and price from click event
         chart: The chart instance for drawing markers
     """
-    print(data)
+    # print(data)
     # Use the double-click tracker to handle distance calculation
     # Pass the specific chart that was clicked to ensure markers are drawn on the correct chart
+    logger.info(f"Handling click on chart {chart.id} with data: {data}")
     double_click_tracker.handle_click(data, chart)
 
 
