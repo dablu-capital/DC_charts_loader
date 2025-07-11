@@ -463,6 +463,9 @@ def on_chart_click(chart, time, price):
 
 
 def subscribe_click(chart, *, callback):
+    # Create unique handler name for this chart
+    handler_name = f"on_click_{chart.id}"
+    
     js = (
         "function clickHandler(param) {"
         "if (!param.point) {"
@@ -471,7 +474,7 @@ def subscribe_click(chart, *, callback):
         f"const time = {chart.id}.chart.timeScale().coordinateToTime(param.point.x);"
         f"const price = {chart.id}.series.coordinateToPrice(param.point.y);"
         "const data = JSON.stringify({time: time, price: price});"
-        f"window.callbackFunction(`on_click_~_${chart.id}_~_${{data}}`);"
+        f"window.callbackFunction(`{handler_name}_~_${{data}}`);"
         "}"
         f"{chart.id}.chart.subscribeClick(clickHandler);"
     )
@@ -487,7 +490,7 @@ def subscribe_click(chart, *, callback):
             return callback(data, target_chart)
         return decorated_callback
 
-    chart.win.handlers[f"on_click_{chart.id}"] = create_decorated_callback(chart)
+    chart.win.handlers[handler_name] = create_decorated_callback(chart)
     chart.win.run_script(js)
 
 
