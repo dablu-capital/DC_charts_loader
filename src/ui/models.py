@@ -84,8 +84,7 @@ class SingleChartPlotter(ChartPlotter):
             button_text="📏❌",
             func=lambda chart: double_click_tracker.clear_drawings(),
         )
-        # self.chart.events.click += on_chart_click
-        watch_crosshair_moves(self.chart)
+        # watch_crosshair_moves(self.chart)
         subscribe_click(self.chart, callback=on_chart_click2)
 
         self.bind_hotkeys()
@@ -156,7 +155,7 @@ class DualChartPlotter(ChartPlotter):
             self.chart2_data = ChartsMinuteData(chart_data.dict_filename, min_filename)
         else:
             self.chart2_data = chart2_data
-        self.chart = Chart(inner_width=0.5, inner_height=1.0)
+        self.chart = Chart(inner_width=0.5, inner_height=1.0, toolbox=True)
         self.right_chart = self.chart.create_subchart(
             position="right", width=0.5, height=1.0
         )
@@ -209,6 +208,24 @@ class DualChartPlotter(ChartPlotter):
 
             # Add separator
             chart_.topbar.textbox("sep", " | ", align="right")
+            
+            # Add toolbox clear button for each chart
+            chart_.topbar.button(
+                "clear",
+                button_text="❌",
+                func=lambda chart: clear_drawings(chart),
+            )
+            
+            # Add double-click tracker subscription for each chart
+            subscribe_click(chart_, callback=on_chart_click2)
+            
+        # Add a unified clear measurements button on the main chart
+        self.chart.topbar.button(
+            "clear_distance",
+            button_text="📏❌",
+            func=lambda chart: double_click_tracker.clear_drawings(),
+        )
+        
         self.bind_hotkeys()
 
     def update_chart(
@@ -272,11 +289,14 @@ class DoubleClickTracker:
         self.first_click: Optional[Dict[str, Any]] = None
         self.click_count: int = 0
         self.chart: Optional[Chart] = None
-        self.current_drawings: List[Any] = []
+        self.current_drawings: Dict[str, List[Any]] = {}
         
     def set_chart(self, chart: Chart) -> None:
         """Set the chart instance for drawing markers."""
         self.chart = chart
+        # Initialize drawings list for this chart if not exists
+        if chart.id not in self.current_drawings:
+            self.current_drawings[chart.id] = []
         
     def handle_click(self, data: Dict[str, Any]) -> None:
         """
@@ -338,7 +358,7 @@ class DoubleClickTracker:
                 color='blue',
                 text='1'
             )
-            self.current_drawings.append(marker)
+            self.current_drawings[self.chart.id].append(marker)
         except Exception as e:
             logger.warning(f"Could not add first click marker: {e}")
             
@@ -356,7 +376,7 @@ class DoubleClickTracker:
                 color='red',
                 text='2'
             )
-            self.current_drawings.append(marker2)
+            self.current_drawings[self.chart.id].append(marker2)
             
             # Create trend line connecting the two points
             trend_line = self.chart.trend_line(
@@ -365,7 +385,7 @@ class DoubleClickTracker:
                 end_time=second_click['timestamp'],
                 end_value=second_click['price']
             )
-            self.current_drawings.append(trend_line)
+            self.current_drawings[self.chart.id].append(trend_line)
             
             # Add horizontal line at midpoint with distance info
             mid_price = (first_click['price'] + second_click['price']) / 2
@@ -379,22 +399,23 @@ class DoubleClickTracker:
                 text=info_text,
                 axis_label_visible=True
             )
-            self.current_drawings.append(info_line)
+            self.current_drawings[self.chart.id].append(info_line)
             
         except Exception as e:
             logger.warning(f"Could not add distance markers: {e}")
             
     def clear_drawings(self) -> None:
-        """Clear all current drawings from the chart."""
-        for drawing in self.current_drawings:
-            try:
-                if hasattr(drawing, 'delete'):
-                    drawing.delete()
-                elif hasattr(drawing, 'remove'):
-                    drawing.remove()
-            except Exception as e:
-                logger.warning(f"Could not remove drawing: {e}")
-        self.current_drawings = []
+        """Clear all current drawings from all charts."""
+        for drawings in self.current_drawings.values():
+            for drawing in drawings:
+                try:
+                    if hasattr(drawing, 'delete'):
+                        drawing.delete()
+                    elif hasattr(drawing, 'remove'):
+                        drawing.remove()
+                except Exception as e:
+                    logger.warning(f"Could not remove drawing: {e}")
+        self.current_drawings = {}
             
     def reset(self) -> None:
         """Reset the tracker for new measurement."""

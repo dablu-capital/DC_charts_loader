@@ -421,6 +421,7 @@ class TestDoubleClickTracker:
         tracker = DoubleClickTracker()
         assert tracker.first_click is None
         assert tracker.click_count == 0
+        assert tracker.current_drawings == {}
 
     def test_first_click(self):
         """Test handling first click."""
@@ -532,15 +533,18 @@ class TestDoubleClickTracker:
         """Test setting chart instance."""
         tracker = DoubleClickTracker()
         mock_chart = Mock()
+        mock_chart.id = "test_chart"
         
         tracker.set_chart(mock_chart)
         
         assert tracker.chart == mock_chart
+        assert "test_chart" in tracker.current_drawings
 
     def test_visual_markers_first_click(self):
         """Test adding visual marker for first click."""
         tracker = DoubleClickTracker()
         mock_chart = Mock()
+        mock_chart.id = "test_chart"
         mock_marker = Mock()
         mock_chart.marker.return_value = mock_marker
         
@@ -563,12 +567,13 @@ class TestDoubleClickTracker:
         )
         
         # Should have stored the marker in drawings
-        assert mock_marker in tracker.current_drawings
+        assert mock_marker in tracker.current_drawings["test_chart"]
 
     def test_visual_markers_second_click(self):
         """Test adding visual markers for second click with distance measurement."""
         tracker = DoubleClickTracker()
         mock_chart = Mock()
+        mock_chart.id = "test_chart"
         mock_marker1 = Mock()
         mock_marker2 = Mock()
         mock_trend_line = Mock()
@@ -612,7 +617,7 @@ class TestDoubleClickTracker:
         # Mock drawings with delete method
         drawing1 = Mock()
         drawing2 = Mock()
-        tracker.current_drawings = [drawing1, drawing2]
+        tracker.current_drawings = {"chart1": [drawing1], "chart2": [drawing2]}
         
         tracker.clear_drawings()
         
@@ -620,7 +625,7 @@ class TestDoubleClickTracker:
         drawing1.delete.assert_called_once()
         drawing2.delete.assert_called_once()
         
-        # Should have cleared the list
+        # Should have cleared the dictionary
         assert len(tracker.current_drawings) == 0
 
     def test_on_chart_click2_callback(self):
@@ -640,3 +645,43 @@ class TestDoubleClickTracker:
             # Should have set chart and handled click
             mock_tracker.set_chart.assert_called_once_with(mock_chart)
             mock_tracker.handle_click.assert_called_once_with(test_data)
+
+    def test_multi_chart_support(self):
+        """Test that tracker can handle multiple charts."""
+        tracker = DoubleClickTracker()
+        
+        # Setup two mock charts
+        chart1 = Mock()
+        chart1.id = "chart1"
+        chart2 = Mock()
+        chart2.id = "chart2"
+        
+        marker1 = Mock()
+        marker2 = Mock()
+        chart1.marker.return_value = marker1
+        chart2.marker.return_value = marker2
+        
+        # First click on chart1
+        tracker.set_chart(chart1)
+        test_data1 = {
+            'timestamp': datetime(2023, 1, 1, 10, 0, 0),
+            'price': 100.0
+        }
+        tracker.handle_click(test_data1)
+        
+        # Second click on chart2 (should work across charts)
+        tracker.set_chart(chart2)
+        test_data2 = {
+            'timestamp': datetime(2023, 1, 2, 10, 0, 0),
+            'price': 150.0
+        }
+        
+        with patch('src.ui.models.logger'):
+            tracker.handle_click(test_data2)
+        
+        # Should have drawings in both charts
+        assert len(tracker.current_drawings) == 2
+        assert "chart1" in tracker.current_drawings
+        assert "chart2" in tracker.current_drawings
+        assert marker1 in tracker.current_drawings["chart1"]
+        assert marker2 in tracker.current_drawings["chart2"]
