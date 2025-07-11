@@ -476,29 +476,49 @@ def on_chart_click(chart, time, price):
 def subscribe_click(chart, *, callback):
     # Register the chart in the global registry
     chart_registry[chart.id] = chart
+    logger.info(f"Registered chart {chart.id} in registry. Registry now has: {list(chart_registry.keys())}")
     
     # Create unique handler name for this chart
     handler_name = f"on_click_{chart.id}"
     
-    js = (
-        "function clickHandler(param) {"
-        "if (!param.point) {"
-        "return;"
-        "}"
-        f"const time = {chart.id}.chart.timeScale().coordinateToTime(param.point.x);"
-        f"const price = {chart.id}.series.coordinateToPrice(param.point.y);"
-        f"const chartId = '{chart.id}';"
-        "const data = JSON.stringify({time: time, price: price, chartId: chartId});"
-        f"window.callbackFunction(`{handler_name}_~_${{data}}`);"
-        "}"
-        f"{chart.id}.chart.subscribeClick(clickHandler);"
-    )
+    # Use a more robust approach - create a closure to capture the chart ID
+    js = f"""
+    (function() {{
+        const chartId = '{chart.id}';
+        const handlerName = '{handler_name}';
+        
+        function clickHandler(param) {{
+            if (!param.point) {{
+                return;
+            }}
+            
+            const time = {chart.id}.chart.timeScale().coordinateToTime(param.point.x);
+            const price = {chart.id}.series.coordinateToPrice(param.point.y);
+            
+            const data = JSON.stringify({{
+                time: time,
+                price: price,
+                chartId: chartId
+            }});
+            
+            console.log('Chart ' + chartId + ' clicked, sending data:', data);
+            window.callbackFunction(handlerName + '_~_' + data);
+        }}
+        
+        {chart.id}.chart.subscribeClick(clickHandler);
+    }})();
+    """
 
     def decorated_callback(data):
         # add some preprocessing
         logger.info(f"Raw data received: {data}")
-        data = json.loads(data)
-        logger.info(f"Parsed JSON data: {data}")
+        
+        try:
+            data = json.loads(data)
+            logger.info(f"Parsed JSON data: {data}")
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON data: {data}, error: {e}")
+            return
         
         # Check if time is None or invalid
         if data.get("time") is None:
@@ -507,19 +527,27 @@ def subscribe_click(chart, *, callback):
             
         # Get the chart from the registry using the chart ID
         chart_id = data.get("chartId")
+        logger.info(f"Looking up chart_id '{chart_id}' in registry: {list(chart_registry.keys())}")
         target_chart = chart_registry.get(chart_id)
         
         if target_chart is None:
-            logger.error(f"Chart {chart_id} not found in registry")
-            return
+            logger.error(f"Chart {chart_id} not found in registry! Available charts: {list(chart_registry.keys())}")
+            logger.error(f"Falling back to original chart: {chart.id}")
+            target_chart = chart
+        else:
+            logger.info(f"Successfully found chart {chart_id} in registry")
             
-        processed_data = {
-            "timestamp": pd.to_datetime(data["time"], unit="s"),
-            "price": data["price"],
-        }
-        logger.info(f"Processed data: {processed_data}")
-        logger.info(f"Using chart from registry: {target_chart.id}")
-        return callback(processed_data, target_chart)
+        try:
+            processed_data = {
+                "timestamp": pd.to_datetime(data["time"], unit="s"),
+                "price": data["price"],
+            }
+            logger.info(f"Processed data: {processed_data}")
+            logger.info(f"Using chart from registry: {target_chart.id}")
+            return callback(processed_data, target_chart)
+        except Exception as e:
+            logger.error(f"Error processing data: {e}")
+            return
 
     chart.win.handlers[handler_name] = decorated_callback
     chart.win.run_script(js)
