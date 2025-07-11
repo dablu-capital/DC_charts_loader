@@ -10,7 +10,9 @@ from src.ui.models import (
     DualChartPlotter,
     DoubleClickTracker,
     double_click_tracker,
+    double_click_tracker_right,
     on_chart_click2,
+    on_chart_click_right,
 )
 from src.models import ChartsData, ChartsMinuteData
 
@@ -666,6 +668,23 @@ class TestDoubleClickTracker:
             # Should have handled click with the specific chart
             mock_tracker.handle_click.assert_called_once_with(test_data, mock_chart)
 
+    def test_on_chart_click_right_callback(self):
+        """Test the right chart click callback function."""
+        mock_chart = Mock()
+        test_data = {
+            'timestamp': datetime(2023, 1, 1, 10, 0, 0),
+            'price': 100.0
+        }
+        
+        # Reset the global tracker for clean test
+        double_click_tracker_right.reset()
+        
+        with patch('src.ui.models.double_click_tracker_right') as mock_tracker:
+            on_chart_click_right(test_data, mock_chart)
+            
+            # Should have handled click with the specific chart
+            mock_tracker.handle_click.assert_called_once_with(test_data, mock_chart)
+
     def test_multi_chart_support(self):
         """Test that tracker can handle multiple charts."""
         tracker = DoubleClickTracker()
@@ -810,3 +829,42 @@ class TestDoubleClickTracker:
         # Main chart should NOT have received second click drawings
         assert main_chart.trend_line.call_count == 0
         assert main_chart.horizontal_line.call_count == 0
+
+    def test_separate_tracker_instances(self):
+        """Test that main and right chart trackers are independent."""
+        # Reset both trackers
+        double_click_tracker.reset()
+        double_click_tracker_right.reset()
+        
+        # Create mock charts
+        main_chart = Mock()
+        main_chart.id = "main_chart"
+        main_chart.marker.return_value = Mock()
+        
+        right_chart = Mock()
+        right_chart.id = "right_chart"
+        right_chart.marker.return_value = Mock()
+        
+        # First click on main chart
+        main_data = {
+            'timestamp': datetime(2023, 1, 1, 10, 0, 0),
+            'price': 100.0
+        }
+        double_click_tracker.handle_click(main_data, main_chart)
+        
+        # First click on right chart
+        right_data = {
+            'timestamp': datetime(2023, 1, 1, 11, 0, 0),
+            'price': 200.0
+        }
+        double_click_tracker_right.handle_click(right_data, right_chart)
+        
+        # Both trackers should have recorded first clicks independently
+        assert double_click_tracker.click_count == 1
+        assert double_click_tracker_right.click_count == 1
+        assert double_click_tracker.first_click == main_data
+        assert double_click_tracker_right.first_click == right_data
+        
+        # Verify markers were added to correct charts
+        main_chart.marker.assert_called_once()
+        right_chart.marker.assert_called_once()

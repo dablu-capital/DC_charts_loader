@@ -216,19 +216,39 @@ class DualChartPlotter(ChartPlotter):
                 func=lambda chart: clear_drawings(chart),
             )
             
-            # Only add measurement functionality to the main chart (first chart)
-            if i == 0:  # Main chart only
+            # Add measurement functionality to both charts
+            if i == 0:  # Main chart
                 logger.info(f"Setting up click subscription for main chart {chart_.id}")
                 subscribe_click(chart_, callback=on_chart_click2)
+                # Add clear measurement button for main chart
+                chart_.topbar.button(
+                    "clear_distance_main",
+                    button_text="📏❌",
+                    func=lambda chart: double_click_tracker.clear_drawings(),
+                )
+            else:  # Right chart
+                logger.info(f"Setting up click subscription for right chart {chart_.id}")
+                subscribe_click(chart_, callback=on_chart_click_right)
+                # Add clear measurement button for right chart
+                chart_.topbar.button(
+                    "clear_distance_right",
+                    button_text="📏❌",
+                    func=lambda chart: double_click_tracker_right.clear_drawings(),
+                )
             
-        # Add a unified clear measurements button on the main chart
+        # Add a unified clear measurements button that clears both charts
         self.chart.topbar.button(
-            "clear_distance",
-            button_text="📏❌",
-            func=lambda chart: double_click_tracker.clear_drawings(),
+            "clear_distance_all",
+            button_text="📏🧹",
+            func=lambda chart: self._clear_all_measurements(),
         )
         
         self.bind_hotkeys()
+
+    def _clear_all_measurements(self):
+        """Clear measurements from both charts."""
+        double_click_tracker.clear_drawings()
+        double_click_tracker_right.clear_drawings()
 
     def update_chart(
         self, direction: Optional[Literal["previous", "next"]] = "next"
@@ -239,8 +259,9 @@ class DualChartPlotter(ChartPlotter):
             direction (str): 'next' to load next chart, 'previous' to load previous chart.
         """
         self.clear_drawings()
-        # Clear distance markers when changing charts
+        # Clear distance markers from both charts when changing charts
         double_click_tracker.clear_drawings()
+        double_click_tracker_right.clear_drawings()
         if direction == "previous":
             df, metadata = self.chart_data.previous_chart()
             df2, metadata2 = self.chart2_data.previous_chart()
@@ -453,8 +474,9 @@ class DoubleClickTracker:
         self.click_count = 0
 
 
-# Global instance for tracking double clicks
-double_click_tracker = DoubleClickTracker()
+# Global instances for tracking double clicks
+double_click_tracker = DoubleClickTracker()  # For main chart
+double_click_tracker_right = DoubleClickTracker()  # For right chart
 
 
 def on_chart_click(chart, time, price):
@@ -526,19 +548,32 @@ def subscribe_click(chart, *, callback):
 
 def on_chart_click2(data, chart):
     """
-    Enhanced callback function that handles double-click distance measurement.
+    Enhanced callback function that handles double-click distance measurement for main chart.
     
     Args:
         data: Dictionary containing timestamp and price from click event
         chart: The chart instance for drawing markers
     """
-    # print(data)
-    # Use the double-click tracker to handle distance calculation
-    # Pass the specific chart that was clicked to ensure markers are drawn on the correct chart
-    logger.info(f"Handling click on chart {chart.id} with data: {data}")
+    # Use the main chart double-click tracker
+    logger.info(f"Handling main chart click on chart {chart.id} with data: {data}")
     logger.info(f"Chart type: {type(chart)}")
     logger.info(f"Chart object: {chart}")
     double_click_tracker.handle_click(data, chart)
+
+
+def on_chart_click_right(data, chart):
+    """
+    Enhanced callback function that handles double-click distance measurement for right chart.
+    
+    Args:
+        data: Dictionary containing timestamp and price from click event
+        chart: The chart instance for drawing markers
+    """
+    # Use the right chart double-click tracker
+    logger.info(f"Handling right chart click on chart {chart.id} with data: {data}")
+    logger.info(f"Chart type: {type(chart)}")
+    logger.info(f"Chart object: {chart}")
+    double_click_tracker_right.handle_click(data, chart)
 
 
 def watch_crosshair_moves(chart):
