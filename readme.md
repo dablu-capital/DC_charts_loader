@@ -22,6 +22,9 @@ This repository now includes a powerful dual chart grid feature that allows you 
 - **Timeframe switching**: Independent timeframe selection for each chart (1D, 4H, 1H, 15M, 5M, 1M)
 - **Synchronized navigation**: Navigate both charts together
 - **Dual screenshots**: Save screenshots of both charts simultaneously
+- **Interactive drawing tools**: Full toolbox support on both charts
+- **Distance measurement**: Click-to-measure functionality across both charts
+- **Unified controls**: Single button to clear all measurements from both charts
 
 ### Quick Start:
 ```python
@@ -41,12 +44,28 @@ dual_chart.show(block=True)
 python demo_dual_charts.py
 ```
 
-For detailed documentation, see [DUAL_CHARTS_README.md](DUAL_CHARTS_README.md)
-
 ## CONTROLLING THE CHARTS
-shift + 1 -> next chart
-shift + 2 -> previous chart
-shift + s -> screenshot
+
+### Navigation
+- **shift + 1** → next chart
+- **shift + 2** → previous chart  
+- **shift + s** → screenshot
+
+### Interactive Drawing Tools
+- **T** → Trend line drawing tool
+- **H** → Horizontal line drawing tool
+- **R** → Ray line drawing tool
+- **❌** → Clear toolbox drawings
+
+### NEW: Distance Measurement Tool 📏
+- **Double-click** → Click twice on chart to measure distance between points
+- **📏❌** → Clear distance markers
+- **Visual markers**: Blue circle (1st click) → Red circle (2nd click) with connecting line
+- **Measurements display**: 
+  - Time difference (days)
+  - Price difference (absolute)
+  - Percentage change
+- **Cross-chart support**: Works between different charts in dual mode
 
 
 ## TESTING
