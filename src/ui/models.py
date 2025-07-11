@@ -455,6 +455,9 @@ class DoubleClickTracker:
 # Global instance for tracking double clicks
 double_click_tracker = DoubleClickTracker()
 
+# Global registry to map chart IDs to chart instances
+chart_registry = {}
+
 
 def on_chart_click(chart, time, price):
     """
@@ -471,6 +474,9 @@ def on_chart_click(chart, time, price):
 
 
 def subscribe_click(chart, *, callback):
+    # Register the chart in the global registry
+    chart_registry[chart.id] = chart
+    
     # Create unique handler name for this chart
     handler_name = f"on_click_{chart.id}"
     
@@ -481,33 +487,41 @@ def subscribe_click(chart, *, callback):
         "}"
         f"const time = {chart.id}.chart.timeScale().coordinateToTime(param.point.x);"
         f"const price = {chart.id}.series.coordinateToPrice(param.point.y);"
-        "const data = JSON.stringify({time: time, price: price});"
+        f"const chartId = '{chart.id}';"
+        "const data = JSON.stringify({time: time, price: price, chartId: chartId});"
         f"window.callbackFunction(`{handler_name}_~_${{data}}`);"
         "}"
         f"{chart.id}.chart.subscribeClick(clickHandler);"
     )
 
-    def create_decorated_callback(target_chart):
-        def decorated_callback(data):
-            # add some preprocessing
-            logger.info(f"Raw data received: {data}")
-            data = json.loads(data)
-            logger.info(f"Parsed JSON data: {data}")
+    def decorated_callback(data):
+        # add some preprocessing
+        logger.info(f"Raw data received: {data}")
+        data = json.loads(data)
+        logger.info(f"Parsed JSON data: {data}")
+        
+        # Check if time is None or invalid
+        if data.get("time") is None:
+            logger.error(f"Time is None in data: {data}")
+            return
             
-            # Check if time is None or invalid
-            if data.get("time") is None:
-                logger.error(f"Time is None in data: {data}")
-                return
-                
-            data = {
-                "timestamp": pd.to_datetime(data["time"], unit="s"),
-                "price": data["price"],
-            }
-            logger.info(f"Processed data: {data}")
-            return callback(data, target_chart)
-        return decorated_callback
+        # Get the chart from the registry using the chart ID
+        chart_id = data.get("chartId")
+        target_chart = chart_registry.get(chart_id)
+        
+        if target_chart is None:
+            logger.error(f"Chart {chart_id} not found in registry")
+            return
+            
+        processed_data = {
+            "timestamp": pd.to_datetime(data["time"], unit="s"),
+            "price": data["price"],
+        }
+        logger.info(f"Processed data: {processed_data}")
+        logger.info(f"Using chart from registry: {target_chart.id}")
+        return callback(processed_data, target_chart)
 
-    chart.win.handlers[handler_name] = create_decorated_callback(chart)
+    chart.win.handlers[handler_name] = decorated_callback
     chart.win.run_script(js)
 
 
