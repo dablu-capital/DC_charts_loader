@@ -216,9 +216,10 @@ class DualChartPlotter(ChartPlotter):
                 func=lambda chart: clear_drawings(chart),
             )
             
-            # Add double-click tracker subscription for each chart
-            logger.info(f"Setting up click subscription for chart {chart_.id}")
-            subscribe_click(chart_, callback=on_chart_click2)
+            # Only add measurement functionality to the main chart (first chart)
+            if i == 0:  # Main chart only
+                logger.info(f"Setting up click subscription for main chart {chart_.id}")
+                subscribe_click(chart_, callback=on_chart_click2)
             
         # Add a unified clear measurements button on the main chart
         self.chart.topbar.button(
@@ -455,9 +456,6 @@ class DoubleClickTracker:
 # Global instance for tracking double clicks
 double_click_tracker = DoubleClickTracker()
 
-# Global registry to map chart IDs to chart instances
-chart_registry = {}
-
 
 def on_chart_click(chart, time, price):
     """
@@ -474,14 +472,13 @@ def on_chart_click(chart, time, price):
 
 
 def subscribe_click(chart, *, callback):
-    # Register the chart in the global registry
-    chart_registry[chart.id] = chart
-    logger.info(f"Registered chart {chart.id} in registry. Registry now has: {list(chart_registry.keys())}")
+    # Simplified approach - no registry needed since we only use the main chart
+    logger.info(f"Setting up click subscription for chart {chart.id}")
     
     # Create unique handler name for this chart
     handler_name = f"on_click_{chart.id}"
     
-    # Use the original JavaScript approach but add chartId to the data
+    # Simple JavaScript approach - just use the chart directly
     js = (
         "function clickHandler(param) {"
         "if (!param.point) {"
@@ -489,8 +486,7 @@ def subscribe_click(chart, *, callback):
         "}"
         f"const time = {chart.id}.chart.timeScale().coordinateToTime(param.point.x);"
         f"const price = {chart.id}.series.coordinateToPrice(param.point.y);"
-        f"const chartId = '{chart.id}';"
-        "const data = JSON.stringify({time: time, price: price, chartId: chartId});"
+        "const data = JSON.stringify({time: time, price: price});"
         f"window.callbackFunction(`{handler_name}_~_${{data}}`);"
         "}"
         f"{chart.id}.chart.subscribeClick(clickHandler);"
@@ -512,26 +508,14 @@ def subscribe_click(chart, *, callback):
             logger.error(f"Time is None in data: {data}")
             return
             
-        # Get the chart from the registry using the chart ID
-        chart_id = data.get("chartId")
-        logger.info(f"Looking up chart_id '{chart_id}' in registry: {list(chart_registry.keys())}")
-        target_chart = chart_registry.get(chart_id)
-        
-        if target_chart is None:
-            logger.error(f"Chart {chart_id} not found in registry! Available charts: {list(chart_registry.keys())}")
-            logger.error(f"Falling back to original chart: {chart.id}")
-            target_chart = chart
-        else:
-            logger.info(f"Successfully found chart {chart_id} in registry")
-            
         try:
             processed_data = {
                 "timestamp": pd.to_datetime(data["time"], unit="s"),
                 "price": data["price"],
             }
             logger.info(f"Processed data: {processed_data}")
-            logger.info(f"Using chart from registry: {target_chart.id}")
-            return callback(processed_data, target_chart)
+            logger.info(f"Using chart directly: {chart.id}")
+            return callback(processed_data, chart)
         except Exception as e:
             logger.error(f"Error processing data: {e}")
             return
