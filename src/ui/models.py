@@ -471,21 +471,23 @@ def subscribe_click(chart, *, callback):
         f"const time = {chart.id}.chart.timeScale().coordinateToTime(param.point.x);"
         f"const price = {chart.id}.series.coordinateToPrice(param.point.y);"
         "const data = JSON.stringify({time: time, price: price});"
-        "window.callbackFunction(`on_click_~_${data}`);"
+        f"window.callbackFunction(`on_click_~_${chart.id}_~_${{data}}`);"
         "}"
         f"{chart.id}.chart.subscribeClick(clickHandler);"
     )
 
-    def decorated_callback(data, captured_chart=chart):
-        # add some preprocessing
-        data = json.loads(data)
-        data = {
-            "timestamp": pd.to_datetime(data["time"], unit="s"),
-            "price": data["price"],
-        }
-        return callback(data, captured_chart)
+    def create_decorated_callback(target_chart):
+        def decorated_callback(data):
+            # add some preprocessing
+            data = json.loads(data)
+            data = {
+                "timestamp": pd.to_datetime(data["time"], unit="s"),
+                "price": data["price"],
+            }
+            return callback(data, target_chart)
+        return decorated_callback
 
-    chart.win.handlers["on_click"] = decorated_callback
+    chart.win.handlers[f"on_click_{chart.id}"] = create_decorated_callback(chart)
     chart.win.run_script(js)
 
 
