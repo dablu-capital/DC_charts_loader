@@ -481,21 +481,19 @@ def subscribe_click(chart, *, callback):
     # Create unique handler name for this chart
     handler_name = f"on_click_{chart.id}"
     
-    # Use a simpler approach that doesn't interfere with the chart's button creation
+    # Use the original JavaScript approach but add chartId to the data
     js = (
-        f"(function() {{"
-        f"const chartId = '{chart.id}';"
-        f"const handlerName = '{handler_name}';"
-        f"function clickHandler(param) {{"
-        f"if (!param.point) {{ return; }}"
+        "function clickHandler(param) {"
+        "if (!param.point) {"
+        "return;"
+        "}"
         f"const time = {chart.id}.chart.timeScale().coordinateToTime(param.point.x);"
         f"const price = {chart.id}.series.coordinateToPrice(param.point.y);"
-        f"const data = JSON.stringify({{ time: time, price: price, chartId: chartId }});"
-        f"console.log('Chart ' + chartId + ' clicked, sending data:', data);"
-        f"window.callbackFunction(handlerName + '_~_' + data);"
-        f"}}"
+        f"const chartId = '{chart.id}';"
+        "const data = JSON.stringify({time: time, price: price, chartId: chartId});"
+        f"window.callbackFunction(`{handler_name}_~_${{data}}`);"
+        "}"
         f"{chart.id}.chart.subscribeClick(clickHandler);"
-        f"}})();"
     )
 
     def decorated_callback(data):
