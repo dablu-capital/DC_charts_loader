@@ -82,7 +82,7 @@ class SingleChartPlotter(ChartPlotter):
         self.chart.topbar.button(
             "clear_distance",
             button_text="📏❌",
-            func=lambda: double_click_tracker.clear_drawings(),
+            func=lambda chart: double_click_tracker.clear_drawings(),
         )
         # self.chart.events.click += on_chart_click
         watch_crosshair_moves(self.chart)
