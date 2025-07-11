@@ -301,13 +301,26 @@ class DoubleClickTracker:
         # Keep track of charts that have markers
         self.charts_with_markers[chart.id] = chart
         
-    def handle_click(self, data: Dict[str, Any]) -> None:
+    def handle_click(self, data: Dict[str, Any], chart: Optional[Chart] = None) -> None:
         """
         Handle click events and calculate distance on second click.
         
         Args:
             data: Dictionary containing timestamp and price from click event
+            chart: The specific chart instance that was clicked (optional, uses stored chart if not provided)
         """
+        # Use the provided chart or fall back to stored chart
+        active_chart = chart if chart is not None else self.chart
+        if active_chart is None:
+            logger.warning("No chart available for handling click")
+            return
+            
+        # Ensure chart is tracked
+        if active_chart.id not in self.current_drawings:
+            self.current_drawings[active_chart.id] = []
+        if active_chart.id not in self.charts_with_markers:
+            self.charts_with_markers[active_chart.id] = active_chart
+        
         self.click_count += 1
         
         if self.click_count == 1:
@@ -316,9 +329,8 @@ class DoubleClickTracker:
             logger.info(f"First click recorded at time: {data['timestamp']}, price: {data['price']}")
             print(f"First click: {data['timestamp']}, price: {data['price']}")
             
-            # Add marker for first click
-            if self.chart:
-                self._add_first_click_marker(data)
+            # Add marker for first click on the specific chart that was clicked
+            self._add_first_click_marker(data, active_chart)
             
         elif self.click_count == 2 and self.first_click is not None:
             # Calculate distance on second click
@@ -342,20 +354,17 @@ class DoubleClickTracker:
             print(f"  First click: {self.first_click['timestamp']} at {self.first_click['price']}")
             print(f"  Second click: {second_click['timestamp']} at {second_click['price']}")
             
-            # Add visual markers to chart
-            if self.chart:
-                self._add_distance_markers(self.first_click, second_click, days_diff, price_diff, price_change_pct)
+            # Add visual markers to the specific chart that was clicked
+            self._add_distance_markers(self.first_click, second_click, days_diff, price_diff, price_change_pct, active_chart)
             
             # Reset for next measurement
             self.reset()
             
-    def _add_first_click_marker(self, data: Dict[str, Any]) -> None:
+    def _add_first_click_marker(self, data: Dict[str, Any], chart: Chart) -> None:
         """Add a marker for the first click."""
-        if self.chart is None:
-            return
         try:
-            # Create marker - this doesn't return an object we can delete later
-            self.chart.marker(
+            # Create marker on the specific chart that was clicked
+            chart.marker(
                 time=data['timestamp'],
                 position='below',
                 shape='circle',
@@ -367,13 +376,11 @@ class DoubleClickTracker:
             logger.warning(f"Could not add first click marker: {e}")
             
     def _add_distance_markers(self, first_click: Dict[str, Any], second_click: Dict[str, Any], 
-                             days_diff: float, price_diff: float, price_change_pct: float) -> None:
+                             days_diff: float, price_diff: float, price_change_pct: float, chart: Chart) -> None:
         """Add visual markers showing the distance measurement."""
-        if self.chart is None:
-            return
         try:
-            # Add marker for second click - markers will be cleared using chart.clear_markers()
-            self.chart.marker(
+            # Add marker for second click on the specific chart that was clicked
+            chart.marker(
                 time=second_click['timestamp'],
                 position='below',
                 shape='circle',
@@ -382,19 +389,19 @@ class DoubleClickTracker:
             )
             
             # Create trend line connecting the two points - these can be deleted individually
-            trend_line = self.chart.trend_line(
+            trend_line = chart.trend_line(
                 start_time=first_click['timestamp'],
                 start_value=first_click['price'],
                 end_time=second_click['timestamp'],
                 end_value=second_click['price']
             )
-            self.current_drawings[self.chart.id].append(trend_line)
+            self.current_drawings[chart.id].append(trend_line)
             
             # Add horizontal line at midpoint with distance info - these can be deleted individually
             mid_price = (first_click['price'] + second_click['price']) / 2
             info_text = f"Δ{days_diff:.1f}d | Δ${price_diff:.2f} | {price_change_pct:+.1f}%"
             
-            info_line = self.chart.horizontal_line(
+            info_line = chart.horizontal_line(
                 price=mid_price,
                 color='purple',
                 width=1,
@@ -402,7 +409,7 @@ class DoubleClickTracker:
                 text=info_text,
                 axis_label_visible=True
             )
-            self.current_drawings[self.chart.id].append(info_line)
+            self.current_drawings[chart.id].append(info_line)
             
         except Exception as e:
             logger.warning(f"Could not add distance markers: {e}")
@@ -491,10 +498,9 @@ def on_chart_click2(data, chart):
         chart: The chart instance for drawing markers
     """
     print(data)
-    # Set the chart instance in the tracker
-    double_click_tracker.set_chart(chart)
     # Use the double-click tracker to handle distance calculation
-    double_click_tracker.handle_click(data)
+    # Pass the specific chart that was clicked to ensure markers are drawn on the correct chart
+    double_click_tracker.handle_click(data, chart)
 
 
 def watch_crosshair_moves(chart):

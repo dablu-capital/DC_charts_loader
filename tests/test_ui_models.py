@@ -427,13 +427,15 @@ class TestDoubleClickTracker:
     def test_first_click(self):
         """Test handling first click."""
         tracker = DoubleClickTracker()
+        mock_chart = Mock()
+        mock_chart.id = "test_chart"
         test_data = {
             'timestamp': datetime(2023, 1, 1, 10, 0, 0),
             'price': 100.0
         }
         
         with patch('src.ui.models.logger') as mock_logger:
-            tracker.handle_click(test_data)
+            tracker.handle_click(test_data, mock_chart)
         
         assert tracker.click_count == 1
         assert tracker.first_click == test_data
@@ -448,7 +450,10 @@ class TestDoubleClickTracker:
             'timestamp': datetime(2023, 1, 1, 10, 0, 0),
             'price': 100.0
         }
-        tracker.handle_click(first_click)
+        mock_chart = Mock()
+        mock_chart.id = "test_chart"
+        
+        tracker.handle_click(first_click, mock_chart)
         
         # Second click - 1 day later, $50 higher
         second_click = {
@@ -457,7 +462,7 @@ class TestDoubleClickTracker:
         }
         
         with patch('src.ui.models.logger') as mock_logger:
-            tracker.handle_click(second_click)
+            tracker.handle_click(second_click, mock_chart)
         
         # Should have logged distance calculation
         calls = mock_logger.info.call_args_list
@@ -487,6 +492,8 @@ class TestDoubleClickTracker:
     def test_price_difference_calculation(self):
         """Test price difference calculation with different scenarios."""
         tracker = DoubleClickTracker()
+        mock_chart = Mock()
+        mock_chart.id = "test_chart"
         
         # Test case: second price lower than first
         first_click = {
@@ -498,10 +505,10 @@ class TestDoubleClickTracker:
             'price': 150.0
         }
         
-        tracker.handle_click(first_click)
+        tracker.handle_click(first_click, mock_chart)
         
         with patch('src.ui.models.logger') as mock_logger:
-            tracker.handle_click(second_click)
+            tracker.handle_click(second_click, mock_chart)
         
         # Should calculate absolute difference
         distance_log = mock_logger.info.call_args_list[1][0][0]
@@ -510,6 +517,8 @@ class TestDoubleClickTracker:
     def test_time_difference_calculation(self):
         """Test time difference calculation in days."""
         tracker = DoubleClickTracker()
+        mock_chart = Mock()
+        mock_chart.id = "test_chart"
         
         # Test case: 12 hours difference
         first_click = {
@@ -521,10 +530,10 @@ class TestDoubleClickTracker:
             'price': 100.0
         }
         
-        tracker.handle_click(first_click)
+        tracker.handle_click(first_click, mock_chart)
         
         with patch('src.ui.models.logger') as mock_logger:
-            tracker.handle_click(second_click)
+            tracker.handle_click(second_click, mock_chart)
         
         # Should calculate 0.5 days (12 hours)
         distance_log = mock_logger.info.call_args_list[1][0][0]
@@ -557,7 +566,7 @@ class TestDoubleClickTracker:
             'price': 100.0
         }
         
-        tracker.handle_click(test_data)
+        tracker.handle_click(test_data, mock_chart)
         
         # Should have called chart.marker
         mock_chart.marker.assert_called_once_with(
@@ -593,7 +602,7 @@ class TestDoubleClickTracker:
             'timestamp': datetime(2023, 1, 1, 10, 0, 0),
             'price': 100.0
         }
-        tracker.handle_click(first_click)
+        tracker.handle_click(first_click, mock_chart)
         
         # Second click
         second_click = {
@@ -602,7 +611,7 @@ class TestDoubleClickTracker:
         }
         
         with patch('src.ui.models.logger'):
-            tracker.handle_click(second_click)
+            tracker.handle_click(second_click, mock_chart)
         
         # Should have called chart methods
         assert mock_chart.marker.call_count == 2
@@ -654,9 +663,8 @@ class TestDoubleClickTracker:
         with patch('src.ui.models.double_click_tracker') as mock_tracker:
             on_chart_click2(test_data, mock_chart)
             
-            # Should have set chart and handled click
-            mock_tracker.set_chart.assert_called_once_with(mock_chart)
-            mock_tracker.handle_click.assert_called_once_with(test_data)
+            # Should have handled click with the specific chart
+            mock_tracker.handle_click.assert_called_once_with(test_data, mock_chart)
 
     def test_multi_chart_support(self):
         """Test that tracker can handle multiple charts."""
@@ -679,7 +687,7 @@ class TestDoubleClickTracker:
             'timestamp': datetime(2023, 1, 1, 10, 0, 0),
             'price': 100.0
         }
-        tracker.handle_click(test_data1)
+        tracker.handle_click(test_data1, chart1)
         
         # Second click on chart2 (should work across charts)
         tracker.set_chart(chart2)
@@ -689,7 +697,7 @@ class TestDoubleClickTracker:
         }
         
         with patch('src.ui.models.logger'):
-            tracker.handle_click(test_data2)
+            tracker.handle_click(test_data2, chart2)
         
         # Should have drawings tracking for both charts
         assert len(tracker.current_drawings) == 2  # Both charts initialized
@@ -725,7 +733,7 @@ class TestDoubleClickTracker:
             'timestamp': datetime(2023, 1, 1, 10, 0, 0),
             'price': 100.0
         }
-        tracker.handle_click(first_click)
+        tracker.handle_click(first_click, mock_chart)
         
         second_click = {
             'timestamp': datetime(2023, 1, 2, 10, 0, 0),
@@ -733,7 +741,7 @@ class TestDoubleClickTracker:
         }
         
         with patch('src.ui.models.logger'):
-            tracker.handle_click(second_click)
+            tracker.handle_click(second_click, mock_chart)
         
         # Should have created markers and other drawings
         assert mock_chart.marker.call_count == 2  # First and second click markers
@@ -745,3 +753,60 @@ class TestDoubleClickTracker:
         
         # Should have called clear_markers to remove all markers
         mock_chart.clear_markers.assert_called_once()
+
+    def test_dual_chart_correct_chart_drawing(self):
+        """Test that measurements are drawn on the specific chart that was clicked in dual mode."""
+        tracker = DoubleClickTracker()
+        
+        # Setup two different charts
+        main_chart = Mock()
+        main_chart.id = "main_chart"
+        main_chart.marker.return_value = Mock()
+        main_chart.trend_line.return_value = Mock()
+        main_chart.horizontal_line.return_value = Mock()
+        
+        right_chart = Mock()
+        right_chart.id = "right_chart"
+        right_chart.marker.return_value = Mock()
+        right_chart.trend_line.return_value = Mock()
+        right_chart.horizontal_line.return_value = Mock()
+        
+        # First click on main chart
+        first_click = {
+            'timestamp': datetime(2023, 1, 1, 10, 0, 0),
+            'price': 100.0
+        }
+        tracker.handle_click(first_click, main_chart)
+        
+        # Second click on right chart  
+        second_click = {
+            'timestamp': datetime(2023, 1, 2, 10, 0, 0),
+            'price': 150.0
+        }
+        
+        with patch('src.ui.models.logger'):
+            tracker.handle_click(second_click, right_chart)
+        
+        # Verify that first click marker was drawn on main chart
+        main_chart.marker.assert_called_once_with(
+            time=first_click['timestamp'],
+            position='below',
+            shape='circle',
+            color='blue',
+            text='1'
+        )
+        
+        # Verify that second click marker and lines were drawn on right chart
+        right_chart.marker.assert_called_once_with(
+            time=second_click['timestamp'],
+            position='below',
+            shape='circle',
+            color='red',
+            text='2'
+        )
+        right_chart.trend_line.assert_called_once()
+        right_chart.horizontal_line.assert_called_once()
+        
+        # Main chart should NOT have received second click drawings
+        assert main_chart.trend_line.call_count == 0
+        assert main_chart.horizontal_line.call_count == 0
