@@ -44,6 +44,16 @@ class ImgurValidator(BaseModel):
     refresh_token: Optional[str] = None
 
 
+class CLIValidator(BaseModel):
+    """
+    CLI configuration validator.
+    """
+
+    last_file: Optional[str] = None
+    data_directory: str = "./data"
+    screenshot_directory: str = "./screenshots"
+
+
 class Configuration(BaseModel):
     """
     Main configuration class that includes general settings and specific configurations.
@@ -53,6 +63,7 @@ class Configuration(BaseModel):
     chart: ChartValidator
     indicators: Optional[List[Indicator]]
     imgur: ImgurValidator
+    cli: Optional[CLIValidator] = None
 
 
 # Load the JSON data from the file into a dictionary

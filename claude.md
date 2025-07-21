@@ -31,3 +31,9 @@ python -m pytest --cov
 # Workflow (MODIFY)
 - Be sure to typecheck when you’re done making a series of code changes
 - Prefer running single tests, and not the whole test suite, for performance
+
+## running scripts
+use UV for running scripts
+```bash
+uv run main.py
+```
