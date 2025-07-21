@@ -119,10 +119,39 @@ class MainMenu:
         try:
             print("\n📸 Starting screenshot save process...")
 
+            # Check and create screenshots directory if needed
+            screenshots_dir = self.project_root / "screenshots"
+            if not screenshots_dir.exists():
+                print("📁 Creating screenshots directory...")
+                screenshots_dir.mkdir(exist_ok=True)
+                logger.info(f"Created screenshots directory: {screenshots_dir}")
+
+            # Check if there are any PNG files in the screenshots directory
+            png_files = list(screenshots_dir.glob("*.png"))
+            if not png_files:
+                print("⚠️  No screenshots found in the screenshots directory!")
+                print(f"📍 Screenshots directory: {screenshots_dir}")
+                print("\n💡 To use this feature:")
+                print("   1. Take screenshots of your charts (manually or via chart export)")
+                print("   2. Save them as PNG files in the screenshots/ directory")
+                print("   3. Run this option again to upload them to Imgur and organize them")
+                return False
+
+            print(f"📊 Found {len(png_files)} screenshot(s) to process:")
+            for png_file in png_files:
+                print(f"   • {png_file.name}")
+
             # Get project name from user
             project_name = (
-                input("Enter project name (default: test): ").strip() or "test"
+                input("\nEnter project name (default: test): ").strip() or "test"
             )
+
+            # Check Imgur configuration
+            if config.imgur.client_id == "my_client_id":
+                print("⚠️  Imgur configuration required!")
+                print("Please set your Imgur client_id in config.json.")
+                print("You can get it from https://api.imgur.com/oauth2/addclient")
+                return False
 
             # Run save_project.py with the project name
             save_script = self.project_root / "save_project.py"
@@ -131,12 +160,7 @@ class MainMenu:
                 logger.error(f"❌ Screenshot script not found: {save_script}")
                 return False
 
-            print(f"🔄 Saving screenshots for project: {project_name}")
-
-            # Create a modified environment with the project name
-            import os
-
-            env = os.environ.copy()
+            print(f"🔄 Processing screenshots for project: {project_name}")
 
             # Run the script with automatic input
             process = subprocess.Popen(
@@ -152,21 +176,30 @@ class MainMenu:
             stdout, stderr = process.communicate(input=project_name + "\n")
 
             if process.returncode == 0:
-                print("✅ Screenshots saved successfully!")
+                print("✅ Screenshots processed successfully!")
                 # Display output from save_project.py
                 if stdout:
                     print("\n📋 Output:")
                     print(stdout)
                 return True
             else:
-                print(f"❌ Error saving screenshots:")
+                print(f"❌ Error processing screenshots:")
                 if stderr:
                     print(stderr)
+                if "No such file or directory" in stderr:
+                    print("\n💡 This might be because:")
+                    print("   • Screenshots were moved during processing")
+                    print("   • Imgur authentication failed")
+                    print("   • Network connectivity issues")
                 return False
 
         except Exception as e:
             logger.error(f"Error saving screenshots: {e}")
             print(f"❌ Error saving screenshots: {e}")
+            print("\n💡 Please check:")
+            print("   • Screenshots are present in the screenshots/ directory")
+            print("   • Imgur configuration is correct in config.json")
+            print("   • Network connectivity for Imgur upload")
             return False
 
     def run_menu_loop(self, selected_file: str) -> None:
