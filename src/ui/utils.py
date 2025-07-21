@@ -117,12 +117,13 @@ def _box_values(df: pd.DataFrame) -> list:
         list: List of tuples containing start and end times for each day.
     """
     times_list = []
-    df_grouped = df.groupby(df.index.date)
-    for group in df_grouped:
-        group_df = group[1]
-        start_time = group_df.index[0]
-        end_time = group_df.index[-1]
-        times_list.append((start_time, end_time))
+    # Use pd.Grouper to group by date
+    df_grouped = df.groupby(pd.Grouper(freq='D'))
+    for date, group_df in df_grouped:
+        if not group_df.empty:
+            start_time = group_df.index[0]
+            end_time = group_df.index[-1]
+            times_list.append((start_time, end_time))
     return times_list
 
 

@@ -318,8 +318,11 @@ class TestSaveScreenshot:
         chart.screenshot.assert_called_once()
         chart_data.get_metadata.assert_called_once_with(0)
         
-        expected_filename = 'test_folder/AAPL_2023-01-15_screenshot.png'
-        mock_file_open.assert_called_once_with(expected_filename, 'wb')
+        # The function now uses Path objects, so we need to check for a Path
+        from pathlib import Path
+        from src.ui.utils import ROOT_FOLDER
+        expected_path = ROOT_FOLDER / 'test_folder' / 'AAPL_2023-01-15_screenshot.png'
+        mock_file_open.assert_called_once_with(expected_path, 'wb')
         mock_file_open().write.assert_called_once_with(b'fake_image_data')
 
 
