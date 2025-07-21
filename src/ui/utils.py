@@ -3,10 +3,14 @@ from typing import List, Any
 from src.models import ChartsData, ChartsWMOverride as Chart
 from src.config import config
 from src.logger import logger
+from pathlib import Path
 
 # ASCII symbols for maximize/minimize buttons
 FULLSCREEN = "⬜"
 CLOSE = "×"
+
+# root folder
+ROOT_FOLDER = Path(__file__).parent.parent.parent
 
 
 def plot_chart(df: pd.DataFrame, metadata: dict, chart: Chart) -> List[Any]:
@@ -132,7 +136,11 @@ def save_screenshot(chart: Chart, chart_data: ChartsData, folder="screenshots") 
 
     img = chart.screenshot()
     metadata = chart_data.get_metadata(chart_data.current_index)
-    filename = f"{folder}/{metadata['ticker']}_{metadata['date_str']}_screenshot.png"
+    filename = (
+        ROOT_FOLDER
+        / folder
+        / f"{metadata['ticker']}_{metadata['date_str']}_screenshot.png"
+    )
     with open(filename, "wb") as f:
         f.write(img)
     logger.info(f"Screenshot saved to {filename}")
