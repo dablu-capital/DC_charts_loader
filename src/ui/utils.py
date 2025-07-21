@@ -133,12 +133,15 @@ def plot_line(data: pd.DataFrame, chart: Chart, name: str) -> None:
 
 
 def save_screenshot(chart: Chart, chart_data: ChartsData, folder="screenshots") -> None:
-
+    """Save screenshot for a single chart."""
+    # Ensure screenshots directory exists
+    screenshot_folder = ROOT_FOLDER / folder
+    screenshot_folder.mkdir(exist_ok=True)
+    
     img = chart.screenshot()
     metadata = chart_data.get_metadata(chart_data.current_index)
     filename = (
-        ROOT_FOLDER
-        / folder
+        screenshot_folder
         / f"{metadata['ticker']}_{metadata['date_str']}_screenshot.png"
     )
     with open(filename, "wb") as f:
@@ -186,26 +189,34 @@ def on_timeframe_change(chart, chart_data, timeframe):
 
 
 def save_screenshot_dual(
-    chart1, chart2, chart_data1, chart_data2, folder="../screenshots"
+    chart1, chart2, chart_data1, chart_data2, folder="screenshots"
 ):
     """Save screenshots for both charts."""
+    # Ensure screenshots directory exists
+    screenshot_folder = ROOT_FOLDER / folder
+    screenshot_folder.mkdir(exist_ok=True)
+    
     # Save screenshot for chart 1
     img1 = chart1.screenshot()
     metadata1 = chart_data1.get_metadata(chart_data1.current_index)
     filename1 = (
-        f"{folder}/{metadata1['ticker']}_{metadata1['date_str']}_chart1_screenshot.png"
+        screenshot_folder
+        / f"{metadata1['ticker']}_{metadata1['date_str']}_chart1_screenshot.png"
     )
     with open(filename1, "wb") as f:
         f.write(img1)
+    logger.info(f"Chart 1 screenshot saved to {filename1}")
 
     # Save screenshot for chart 2
     img2 = chart2.screenshot()
     metadata2 = chart_data2.get_metadata(chart_data2.current_index)
     filename2 = (
-        f"{folder}/{metadata2['ticker']}_{metadata2['date_str']}_chart2_screenshot.png"
+        screenshot_folder
+        / f"{metadata2['ticker']}_{metadata2['date_str']}_chart2_screenshot.png"
     )
     with open(filename2, "wb") as f:
         f.write(img2)
+    logger.info(f"Chart 2 screenshot saved to {filename2}")
 
 
 def clear_drawings(chart: Chart) -> None:
